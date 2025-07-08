@@ -31,25 +31,35 @@ def get_tickets():
 
 @app.route('/api/tickets', methods=['POST'])
 def create_ticket():
-    data = request.get_json()
-    
-    ticket = Ticket(
-        job_id=data.get('job_id'),
-        customer_name=data.get('customer_name'),
-        customer_address=data.get('customer_address'),
-        customer_phone=data.get('customer_phone'),
-        service_type=data.get('service_type'),
-        status=data.get('status', 'pending'),
-        priority=data.get('priority', 'medium'),
-        description=data.get('description'),
-        estimated_cost=data.get('estimated_cost'),
-        assigned_technician=data.get('assigned_technician')
-    )
-    
-    db.session.add(ticket)
-    db.session.commit()
-    
-    return jsonify(ticket.to_dict()), 201
+    try:
+        data = request.get_json()
+        
+        # Check if job_id already exists
+        existing_ticket = Ticket.query.filter_by(job_id=data.get('job_id')).first()
+        if existing_ticket:
+            return jsonify({'error': 'Job ID already exists'}), 400
+        
+        ticket = Ticket(
+            job_id=data.get('job_id'),
+            customer_name=data.get('customer_name'),
+            customer_address=data.get('customer_address'),
+            customer_phone=data.get('customer_phone'),
+            service_type=data.get('service_type'),
+            status=data.get('status', 'pending'),
+            priority=data.get('priority', 'medium'),
+            description=data.get('description'),
+            estimated_cost=data.get('estimated_cost'),
+            assigned_technician=data.get('assigned_technician')
+        )
+        
+        db.session.add(ticket)
+        db.session.commit()
+        
+        return jsonify(ticket.to_dict()), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tickets/<int:ticket_id>', methods=['PUT'])
 def update_ticket(ticket_id):

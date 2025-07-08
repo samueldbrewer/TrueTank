@@ -11,6 +11,63 @@ function initializeJobBoard() {
     
     // Initialize drag and drop
     initializeDragAndDrop();
+    
+    // Load existing tickets
+    loadExistingTickets();
+}
+
+function loadExistingTickets() {
+    fetch('/api/tickets')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(tickets => {
+            tickets.forEach(ticket => {
+                createJobCardFromTicket(ticket);
+            });
+            // Update job counter to avoid ID conflicts
+            // Find highest job number and increment
+            let maxJobNum = 0;
+            tickets.forEach(ticket => {
+                const match = ticket.job_id.match(/JOB-(\d+)/);
+                if (match) {
+                    maxJobNum = Math.max(maxJobNum, parseInt(match[1]));
+                }
+            });
+            jobCounter = maxJobNum + 1;
+        })
+        .catch(error => {
+            console.error('Error loading tickets:', error);
+            // Set default job counter if API fails
+            jobCounter = 1;
+        });
+}
+
+function createJobCardFromTicket(ticket) {
+    const container = document.querySelector(`[data-status="${ticket.status}"]`);
+    if (!container) return;
+    
+    const jobCard = document.createElement('div');
+    jobCard.className = 'job-card';
+    jobCard.draggable = true;
+    jobCard.dataset.jobId = ticket.job_id;
+    jobCard.dataset.ticketId = ticket.id;
+    
+    jobCard.innerHTML = `
+        <h4>${ticket.service_type || 'Septic Service'}</h4>
+        <p class="job-id">Job ID: ${ticket.job_id}</p>
+        <p>Customer: ${ticket.customer_name || '[Not assigned]'}</p>
+        <p>Service: ${ticket.service_type || '[Not specified]'}</p>
+        <span class="job-status status-${ticket.status}">${ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).replace('-', ' ')}</span>
+    `;
+    
+    container.appendChild(jobCard);
+    
+    // Add drag event listeners to the card
+    addDragEventListeners(jobCard);
 }
 
 function createBlankJobCard() {
@@ -31,33 +88,20 @@ function createBlankJobCard() {
             description: 'New septic service job'
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(ticket => {
-        // Create the visual card
-        const pendingContainer = document.querySelector('[data-status="pending"]');
-        const jobCard = document.createElement('div');
-        jobCard.className = 'job-card';
-        jobCard.draggable = true;
-        jobCard.dataset.jobId = ticket.job_id;
-        jobCard.dataset.ticketId = ticket.id;
-        
-        jobCard.innerHTML = `
-            <h4>New Septic Job</h4>
-            <p class="job-id">Job ID: ${ticket.job_id}</p>
-            <p>Customer: [Not assigned]</p>
-            <p>Service: [Not specified]</p>
-            <span class="job-status status-pending">Pending</span>
-        `;
-        
-        pendingContainer.appendChild(jobCard);
+        // Create the visual card using the same function
+        createJobCardFromTicket(ticket);
         jobCounter++;
-        
-        // Add drag event listeners to the new card
-        addDragEventListeners(jobCard);
     })
     .catch(error => {
         console.error('Error creating ticket:', error);
-        alert('Failed to create ticket. Please try again.');
+        alert('Failed to create ticket. Please try again. Error: ' + error.message);
     });
 }
 
