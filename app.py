@@ -1,12 +1,22 @@
 import os
 from flask import Flask, render_template, request, jsonify
 from models import db, Ticket
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///truetank.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Development vs Production configuration
+if os.environ.get('FLASK_ENV') == 'development':
+    app.config['DEBUG'] = True
+else:
+    app.config['DEBUG'] = False
 
 # Initialize database
 db.init_app(app)
