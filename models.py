@@ -132,6 +132,7 @@ class Ticket(db.Model):
     scheduled_date = db.Column(db.DateTime, nullable=True)
     estimated_duration = db.Column(db.Integer, nullable=True)  # minutes
     route_position = db.Column(db.Integer, nullable=True)
+    column_position = db.Column(db.Integer, nullable=True, default=0)  # Position within kanban column
     
     # Assignment
     assigned_technician = db.Column(db.String(100), nullable=True)
@@ -220,6 +221,7 @@ class Ticket(db.Model):
             'status': self.status,
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
             'estimated_duration': self.estimated_duration,
+            'column_position': self.column_position,
             'assigned_technician': self.assigned_technician,
             'assigned_crew': self.assigned_crew,
             'estimated_cost': self.estimated_cost,

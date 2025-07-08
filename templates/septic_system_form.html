@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit Septic System' if septic_system else 'Create Septic System' }} - TrueTank{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-header">
+        <h2>{{ 'Edit Septic System' if septic_system else 'Create Septic System' }}</h2>
+        <div class="form-actions">
+            <a href="{{ url_for('customers_view') }}" class="btn btn-secondary">← Back to Customers</a>
+        </div>
+    </div>
+
+    <form id="septic-system-form" class="ticket-form">
+        {% if septic_system %}
+            <input type="hidden" id="system-id" value="{{ septic_system.id }}">
+        {% endif %}
+        
+        <div class="form-grid">
+            <!-- Customer Selection -->
+            <div class="form-section">
+                <h3>Customer Information</h3>
+                
+                <div class="form-group">
+                    <label for="customer_id">Customer *</label>
+                    <select id="customer_id" name="customer_id" required>
+                        <option value="">Select a customer...</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}" 
+                                {{ 'selected' if septic_system and septic_system.customer_id == customer.id else '' }}>
+                            {{ customer.first_name }} {{ customer.last_name }}
+                            {% if customer.company_name %} - {{ customer.company_name }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- System Details -->
+            <div class="form-section">
+                <h3>System Details</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="system_type">System Type *</label>
+                        <select id="system_type" name="system_type" required>
+                            <option value="">Select type...</option>
+                            <option value="conventional" {{ 'selected' if septic_system and septic_system.system_type == 'conventional' else '' }}>Conventional</option>
+                            <option value="aerobic" {{ 'selected' if septic_system and septic_system.system_type == 'aerobic' else '' }}>Aerobic</option>
+                            <option value="advanced_treatment" {{ 'selected' if septic_system and septic_system.system_type == 'advanced_treatment' else '' }}>Advanced Treatment</option>
+                            <option value="commercial" {{ 'selected' if septic_system and septic_system.system_type == 'commercial' else '' }}>Commercial</option>
+                            <option value="holding_tank" {{ 'selected' if septic_system and septic_system.system_type == 'holding_tank' else '' }}>Holding Tank</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tank_size">Tank Size (gallons) *</label>
+                        <input type="number" id="tank_size" name="tank_size" value="{{ septic_system.tank_size if septic_system else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tank_material">Tank Material</label>
+                        <select id="tank_material" name="tank_material">
+                            <option value="">Select material...</option>
+                            <option value="concrete" {{ 'selected' if septic_system and septic_system.tank_material == 'concrete' else '' }}>Concrete</option>
+                            <option value="fiberglass" {{ 'selected' if septic_system and septic_system.tank_material == 'fiberglass' else '' }}>Fiberglass</option>
+                            <option value="plastic" {{ 'selected' if septic_system and septic_system.tank_material == 'plastic' else '' }}>Plastic</option>
+                            <option value="steel" {{ 'selected' if septic_system and septic_system.tank_material == 'steel' else '' }}>Steel</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="num_compartments">Number of Compartments</label>
+                        <input type="number" id="num_compartments" name="num_compartments" value="{{ septic_system.num_compartments if septic_system else '' }}" min="1" max="4">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="system_condition">System Condition</label>
+                    <select id="system_condition" name="system_condition">
+                        <option value="excellent" {{ 'selected' if septic_system and septic_system.system_condition == 'excellent' else '' }}>Excellent</option>
+                        <option value="good" {{ 'selected' if septic_system and septic_system.system_condition == 'good' else '' }}>Good</option>
+                        <option value="fair" {{ 'selected' if septic_system and septic_system.system_condition == 'fair' else '' }}>Fair</option>
+                        <option value="poor" {{ 'selected' if septic_system and septic_system.system_condition == 'poor' else '' }}>Poor</option>
+                        <option value="failing" {{ 'selected' if septic_system and septic_system.system_condition == 'failing' else '' }}>Failing</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Installation Information -->
+            <div class="form-section">
+                <h3>Installation Information</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="install_date">Installation Date</label>
+                        <input type="date" id="install_date" name="install_date" 
+                               value="{{ septic_system.install_date.isoformat() if septic_system and septic_system.install_date else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="permit_number">Permit Number</label>
+                        <input type="text" id="permit_number" name="permit_number" value="{{ septic_system.permit_number if septic_system else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="installer_company">Installer Company</label>
+                    <input type="text" id="installer_company" name="installer_company" value="{{ septic_system.installer_company if septic_system else '' }}">
+                </div>
+            </div>
+
+            <!-- Maintenance Schedule -->
+            <div class="form-section">
+                <h3>Maintenance Schedule</h3>
+                
+                <div class="form-group">
+                    <label for="pump_frequency_months">Pump Frequency (months)</label>
+                    <select id="pump_frequency_months" name="pump_frequency_months">
+                        <option value="12" {{ 'selected' if septic_system and septic_system.pump_frequency_months == 12 else '' }}>12 months</option>
+                        <option value="18" {{ 'selected' if septic_system and septic_system.pump_frequency_months == 18 else '' }}>18 months</option>
+                        <option value="24" {{ 'selected' if septic_system and septic_system.pump_frequency_months == 24 else '' }}>24 months</option>
+                        <option value="36" {{ 'selected' if septic_system and septic_system.pump_frequency_months == 36 else 'selected' }}>36 months</option>
+                        <option value="48" {{ 'selected' if septic_system and septic_system.pump_frequency_months == 48 else '' }}>48 months</option>
+                        <option value="60" {{ 'selected' if septic_system and septic_system.pump_frequency_months == 60 else '' }}>60 months</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="last_pumped">Last Pumped</label>
+                        <input type="date" id="last_pumped" name="last_pumped" 
+                               value="{{ septic_system.last_pumped.isoformat() if septic_system and septic_system.last_pumped else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="next_pump_due">Next Pump Due</label>
+                        <input type="date" id="next_pump_due" name="next_pump_due" 
+                               value="{{ septic_system.next_pump_due.isoformat() if septic_system and septic_system.next_pump_due else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location and Access -->
+            <div class="form-section">
+                <h3>Location and Access</h3>
+                
+                <div class="form-group">
+                    <label for="access_notes">Access Notes</label>
+                    <textarea id="access_notes" name="access_notes" rows="3" placeholder="Describe tank location, access requirements, or special instructions...">{{ septic_system.access_notes if septic_system else '' }}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="gps_coordinates">GPS Coordinates</label>
+                    <input type="text" id="gps_coordinates" name="gps_coordinates" 
+                           value="{{ septic_system.gps_coordinates if septic_system else '' }}" 
+                           placeholder="Latitude, Longitude">
+                </div>
+            </div>
+
+            <!-- Repair Information -->
+            <div class="form-section">
+                <h3>Repair Information</h3>
+                
+                <div class="form-group">
+                    <input type="checkbox" id="needs_repair" name="needs_repair" {{ 'checked' if septic_system and septic_system.needs_repair else '' }}>
+                    <label for="needs_repair">System needs repair</label>
+                </div>
+
+                <div class="form-group">
+                    <label for="repair_notes">Repair Notes</label>
+                    <textarea id="repair_notes" name="repair_notes" rows="3" placeholder="Describe any known issues or required repairs...">{{ septic_system.repair_notes if septic_system else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Update System' if septic_system else 'Create System' }}</button>
+            <a href="{{ url_for('customers_view') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('septic-system-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            if (key === 'needs_repair') {
+                data[key] = true;
+            } else {
+                data[key] = value;
+            }
+        }
+        
+        // Handle unchecked checkboxes
+        if (!formData.has('needs_repair')) data.needs_repair = false;
+        
+        const systemId = document.getElementById('system-id');
+        const isEdit = systemId && systemId.value;
+        
+        if (isEdit) {
+            // Update existing septic system
+            fetch(`/api/septic-systems/${systemId.value}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error updating septic system: ' + result.error);
+                } else {
+                    alert('Septic system updated successfully!');
+                    window.location.href = '/customers';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update septic system. Please try again.');
+            });
+        } else {
+            // Create new septic system
+            fetch('/api/septic-systems', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error creating septic system: ' + result.error);
+                } else {
+                    alert('Septic system created successfully!');
+                    window.location.href = '/customers';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to create septic system. Please try again.');
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

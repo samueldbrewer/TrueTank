@@ -25,9 +25,28 @@ function loadExistingTickets() {
             return response.json();
         })
         .then(tickets => {
+            // Group tickets by status and sort by column_position
+            const ticketsByStatus = {
+                'pending': [],
+                'in-progress': [],
+                'completed': []
+            };
+            
             tickets.forEach(ticket => {
-                createJobCardFromTicket(ticket);
+                if (ticketsByStatus[ticket.status]) {
+                    ticketsByStatus[ticket.status].push(ticket);
+                }
             });
+            
+            // Sort each group by column_position and create cards in order
+            Object.keys(ticketsByStatus).forEach(status => {
+                ticketsByStatus[status]
+                    .sort((a, b) => (a.column_position || 0) - (b.column_position || 0))
+                    .forEach(ticket => {
+                        createJobCardFromTicket(ticket);
+                    });
+            });
+            
             // Update job counter to avoid ID conflicts
             // Find highest job number and increment
             let maxJobNum = 0;
@@ -101,6 +120,9 @@ function createJobCardFromTicket(ticket) {
             <button class="btn-icon" onclick="editTicket(${ticket.id})" title="Edit">
                 <i class="icon-edit">✏️</i>
             </button>
+            <button class="btn-icon btn-delete" onclick="deleteTicket(${ticket.id}, '${ticket.job_id}')" title="Delete">
+                <i class="icon-delete">🗑️</i>
+            </button>
         </div>
     `;
     
@@ -115,8 +137,35 @@ function viewTicketDetails(ticketId) {
 }
 
 function editTicket(ticketId) {
-    // TODO: Implement edit functionality
-    alert('Edit functionality coming soon!');
+    window.location.href = `/ticket/${ticketId}/edit`;
+}
+
+function deleteTicket(ticketId, jobId) {
+    if (confirm(`Are you sure you want to delete ticket "${jobId}"? This action cannot be undone.`)) {
+        fetch(`/api/tickets/${ticketId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Remove the card from the DOM
+                const card = document.querySelector(`[data-ticket-id="${ticketId}"]`);
+                if (card) {
+                    card.remove();
+                }
+                alert('Ticket deleted successfully!');
+            } else {
+                alert('Error deleting ticket: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete ticket. Please try again.');
+        });
+    }
 }
 
 function createBlankJobCard() {
@@ -201,34 +250,79 @@ function handleDrop(e) {
     const targetContainer = e.target.closest('.card-container');
     
     if (draggedCard && targetContainer) {
-        targetContainer.appendChild(draggedCard);
-        updateJobStatus(draggedCard, targetContainer.dataset.status);
+        // Calculate the new position based on drop location
+        const newPosition = calculateDropPosition(e, targetContainer);
+        const newStatus = targetContainer.dataset.status;
+        
+        // Insert the card at the correct position
+        insertCardAtPosition(draggedCard, targetContainer, newPosition);
+        
+        // Update the database with new position and status
+        updateTicketPosition(draggedCard, newStatus, newPosition);
     }
 }
 
-function updateJobStatus(card, newStatus) {
+function updateTicketPosition(card, newStatus, newPosition) {
     const statusElement = card.querySelector('.job-status');
     statusElement.className = `job-status status-${newStatus}`;
     statusElement.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).replace('-', ' ');
     
-    // Update status in database
+    // Update position and status in database using reorder endpoint
     const ticketId = card.dataset.ticketId;
     if (ticketId) {
-        fetch(`/api/tickets/${ticketId}`, {
-            method: 'PUT',
+        fetch('/api/tickets/reorder', {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                status: newStatus
+                ticket_id: parseInt(ticketId),
+                new_status: newStatus,
+                new_position: newPosition
             })
         })
         .then(response => response.json())
-        .then(ticket => {
-            console.log('Ticket status updated:', ticket);
+        .then(result => {
+            if (result.success) {
+                console.log('Ticket position updated:', result.ticket);
+            } else {
+                console.error('Error updating ticket position:', result.error);
+                alert('Failed to update ticket position: ' + result.error);
+            }
         })
         .catch(error => {
-            console.error('Error updating ticket status:', error);
+            console.error('Error updating ticket position:', error);
+            alert('Failed to update ticket position. Please refresh and try again.');
         });
+    }
+}
+
+function calculateDropPosition(event, targetContainer) {
+    const cards = Array.from(targetContainer.children);
+    let newPosition = cards.length; // Default to end
+    
+    for (let i = 0; i < cards.length; i++) {
+        const card = cards[i];
+        const rect = card.getBoundingClientRect();
+        const cardMiddle = rect.top + rect.height / 2;
+        
+        if (event.clientY < cardMiddle) {
+            newPosition = i;
+            break;
+        }
+    }
+    
+    return newPosition;
+}
+
+function insertCardAtPosition(card, container, position) {
+    const cards = Array.from(container.children);
+    
+    if (position >= cards.length) {
+        // Insert at the end
+        container.appendChild(card);
+    } else {
+        // Insert before the card at the target position
+        container.insertBefore(card, cards[position]);
     }
 }

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit Customer' if customer else 'Create Customer' }} - TrueTank{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-header">
+        <h2>{{ 'Edit Customer' if customer else 'Create Customer' }}</h2>
+        <div class="form-actions">
+            <a href="{{ url_for('customers_view') }}" class="btn btn-secondary">← Back to Customers</a>
+        </div>
+    </div>
+
+    <form id="customer-form" class="ticket-form">
+        {% if customer %}
+            <input type="hidden" id="customer-id" value="{{ customer.id }}">
+        {% endif %}
+        
+        <div class="form-grid">
+            <!-- Basic Information -->
+            <div class="form-section">
+                <h3>Basic Information</h3>
+                
+                <div class="form-group">
+                    <label for="customer_type">Customer Type *</label>
+                    <select id="customer_type" name="customer_type" required>
+                        <option value="residential" {{ 'selected' if customer and customer.customer_type == 'residential' else '' }}>Residential</option>
+                        <option value="commercial" {{ 'selected' if customer and customer.customer_type == 'commercial' else '' }}>Commercial</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="first_name">First Name *</label>
+                        <input type="text" id="first_name" name="first_name" value="{{ customer.first_name if customer else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name *</label>
+                        <input type="text" id="last_name" name="last_name" value="{{ customer.last_name if customer else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="company_name">Company Name</label>
+                    <input type="text" id="company_name" name="company_name" value="{{ customer.company_name if customer else '' }}">
+                    <small>For commercial customers or business properties</small>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="form-section">
+                <h3>Contact Information</h3>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" value="{{ customer.email if customer else '' }}">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phone_primary">Primary Phone *</label>
+                        <input type="tel" id="phone_primary" name="phone_primary" value="{{ customer.phone_primary if customer else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone_secondary">Secondary Phone</label>
+                        <input type="tel" id="phone_secondary" name="phone_secondary" value="{{ customer.phone_secondary if customer else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="preferred_contact_method">Preferred Contact Method</label>
+                    <select id="preferred_contact_method" name="preferred_contact_method">
+                        <option value="phone" {{ 'selected' if customer and customer.preferred_contact_method == 'phone' else '' }}>Phone</option>
+                        <option value="email" {{ 'selected' if customer and customer.preferred_contact_method == 'email' else '' }}>Email</option>
+                        <option value="text" {{ 'selected' if customer and customer.preferred_contact_method == 'text' else '' }}>Text Message</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Service Address -->
+            <div class="form-section">
+                <h3>Service Address</h3>
+                
+                <div class="form-group">
+                    <label for="street_address">Street Address *</label>
+                    <input type="text" id="street_address" name="street_address" value="{{ customer.street_address if customer else '' }}" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city">City *</label>
+                        <input type="text" id="city" name="city" value="{{ customer.city if customer else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="state">State *</label>
+                        <input type="text" id="state" name="state" value="{{ customer.state if customer else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="zip_code">ZIP Code *</label>
+                        <input type="text" id="zip_code" name="zip_code" value="{{ customer.zip_code if customer else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="county">County</label>
+                    <input type="text" id="county" name="county" value="{{ customer.county if customer else '' }}">
+                </div>
+            </div>
+
+            <!-- Billing Information -->
+            <div class="form-section">
+                <h3>Billing Information</h3>
+                
+                <div class="form-group">
+                    <input type="checkbox" id="billing_same_as_service" name="billing_same_as_service" checked>
+                    <label for="billing_same_as_service">Billing address same as service address</label>
+                </div>
+
+                <div id="billing-address" style="display: none;">
+                    <div class="form-group">
+                        <label for="billing_street_address">Billing Street Address</label>
+                        <input type="text" id="billing_street_address" name="billing_street_address" value="{{ customer.billing_street_address if customer else '' }}">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="billing_city">Billing City</label>
+                            <input type="text" id="billing_city" name="billing_city" value="{{ customer.billing_city if customer else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="billing_state">Billing State</label>
+                            <input type="text" id="billing_state" name="billing_state" value="{{ customer.billing_state if customer else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="billing_zip_code">Billing ZIP Code</label>
+                            <input type="text" id="billing_zip_code" name="billing_zip_code" value="{{ customer.billing_zip_code if customer else '' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="payment_terms">Payment Terms</label>
+                        <select id="payment_terms" name="payment_terms">
+                            <option value="due_on_receipt" {{ 'selected' if customer and customer.payment_terms == 'due_on_receipt' else '' }}>Due on Receipt</option>
+                            <option value="net_15" {{ 'selected' if customer and customer.payment_terms == 'net_15' else '' }}>Net 15</option>
+                            <option value="net_30" {{ 'selected' if customer and customer.payment_terms == 'net_30' else '' }}>Net 30</option>
+                            <option value="net_60" {{ 'selected' if customer and customer.payment_terms == 'net_60' else '' }}>Net 60</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="tax_exempt" name="tax_exempt" {{ 'checked' if customer and customer.tax_exempt else '' }}>
+                        <label for="tax_exempt">Tax Exempt</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tax_exempt_number">Tax Exempt Number</label>
+                    <input type="text" id="tax_exempt_number" name="tax_exempt_number" value="{{ customer.tax_exempt_number if customer else '' }}">
+                </div>
+            </div>
+
+            <!-- Preferences -->
+            <div class="form-section">
+                <h3>Preferences</h3>
+                
+                <div class="form-group">
+                    <input type="checkbox" id="service_reminders" name="service_reminders" {{ 'checked' if customer and customer.service_reminders else 'checked' }}>
+                    <label for="service_reminders">Send service reminders</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="checkbox" id="marketing_emails" name="marketing_emails" {{ 'checked' if customer and customer.marketing_emails else 'checked' }}>
+                    <label for="marketing_emails">Send marketing emails</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Update Customer' if customer else 'Create Customer' }}</button>
+            <a href="{{ url_for('customers_view') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const billingCheckbox = document.getElementById('billing_same_as_service');
+    const billingAddress = document.getElementById('billing-address');
+    
+    billingCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            billingAddress.style.display = 'none';
+        } else {
+            billingAddress.style.display = 'block';
+        }
+    });
+
+    // Initialize billing address visibility
+    {% if customer and customer.billing_street_address %}
+        billingCheckbox.checked = false;
+        billingAddress.style.display = 'block';
+    {% endif %}
+
+    document.getElementById('customer-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            if (key === 'tax_exempt' || key === 'service_reminders' || key === 'marketing_emails') {
+                data[key] = true;
+            } else {
+                data[key] = value;
+            }
+        }
+        
+        // Handle unchecked checkboxes
+        if (!formData.has('tax_exempt')) data.tax_exempt = false;
+        if (!formData.has('service_reminders')) data.service_reminders = false;
+        if (!formData.has('marketing_emails')) data.marketing_emails = false;
+        
+        const customerId = document.getElementById('customer-id');
+        const isEdit = customerId && customerId.value;
+        
+        if (isEdit) {
+            // Update existing customer
+            fetch(`/api/customers/${customerId.value}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error updating customer: ' + result.error);
+                } else {
+                    alert('Customer updated successfully!');
+                    window.location.href = '/customers';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update customer. Please try again.');
+            });
+        } else {
+            // Create new customer
+            fetch('/api/customers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error creating customer: ' + result.error);
+                } else {
+                    alert('Customer created successfully!');
+                    window.location.href = '/customers';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to create customer. Please try again.');
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

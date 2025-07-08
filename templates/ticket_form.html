@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if ticket else 'Create' }} Ticket - TrueTank{% endblock %}
+
+{% block content %}
+<div class="ticket-form-container">
+    <div class="form-header">
+        <h2>{{ 'Edit Ticket' if ticket else 'Create New Ticket' }}</h2>
+        <div class="form-actions">
+            <a href="{{ url_for('job_board') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </div>
+
+    <form id="ticket-form" method="POST">
+        <div class="form-grid">
+            <!-- Basic Information -->
+            <div class="form-section">
+                <h3>Basic Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="job_id">Job ID*</label>
+                        <input type="text" id="job_id" name="job_id" value="{{ ticket.job_id if ticket else '' }}" {{ 'readonly' if ticket else '' }} required>
+                    </div>
+                    <div class="form-group">
+                        <label for="service_type">Service Type*</label>
+                        <select id="service_type" name="service_type" required>
+                            <option value="">Select Service Type</option>
+                            <option value="Septic Pumping" {{ 'selected' if ticket and ticket.service_type == 'Septic Pumping' else '' }}>Septic Pumping</option>
+                            <option value="Septic Inspection" {{ 'selected' if ticket and ticket.service_type == 'Septic Inspection' else '' }}>Septic Inspection</option>
+                            <option value="Septic Repair" {{ 'selected' if ticket and ticket.service_type == 'Septic Repair' else '' }}>Septic Repair</option>
+                            <option value="Septic Installation" {{ 'selected' if ticket and ticket.service_type == 'Septic Installation' else '' }}>Septic Installation</option>
+                            <option value="Preventive Maintenance" {{ 'selected' if ticket and ticket.service_type == 'Preventive Maintenance' else '' }}>Preventive Maintenance</option>
+                            <option value="Emergency Service" {{ 'selected' if ticket and ticket.service_type == 'Emergency Service' else '' }}>Emergency Service</option>
+                            <option value="Septic Cleaning" {{ 'selected' if ticket and ticket.service_type == 'Septic Cleaning' else '' }}>Septic Cleaning</option>
+                            <option value="Line Cleaning/Rooter" {{ 'selected' if ticket and ticket.service_type == 'Line Cleaning/Rooter' else '' }}>Line Cleaning/Rooter</option>
+                            <option value="Grease Trap Service" {{ 'selected' if ticket and ticket.service_type == 'Grease Trap Service' else '' }}>Grease Trap Service</option>
+                            <option value="Lift Station Service" {{ 'selected' if ticket and ticket.service_type == 'Lift Station Service' else '' }}>Lift Station Service</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="priority">Priority*</label>
+                        <select id="priority" name="priority" required>
+                            <option value="low" {{ 'selected' if ticket and ticket.priority == 'low' else '' }}>Low</option>
+                            <option value="medium" {{ 'selected' if ticket and ticket.priority == 'medium' else '' }}>Medium</option>
+                            <option value="high" {{ 'selected' if ticket and ticket.priority == 'high' else '' }}>High</option>
+                            <option value="urgent" {{ 'selected' if ticket and ticket.priority == 'urgent' else '' }}>Urgent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status*</label>
+                        <select id="status" name="status" required>
+                            <option value="pending" {{ 'selected' if ticket and ticket.status == 'pending' else '' }}>Pending</option>
+                            <option value="scheduled" {{ 'selected' if ticket and ticket.status == 'scheduled' else '' }}>Scheduled</option>
+                            <option value="in-progress" {{ 'selected' if ticket and ticket.status == 'in-progress' else '' }}>In Progress</option>
+                            <option value="completed" {{ 'selected' if ticket and ticket.status == 'completed' else '' }}>Completed</option>
+                            <option value="cancelled" {{ 'selected' if ticket and ticket.status == 'cancelled' else '' }}>Cancelled</option>
+                            <option value="on-hold" {{ 'selected' if ticket and ticket.status == 'on-hold' else '' }}>On Hold</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="service_description">Service Description</label>
+                        <textarea id="service_description" name="service_description" rows="3">{{ ticket.service_description if ticket else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer & System Selection -->
+            <div class="form-section">
+                <h3>Customer & System</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="customer_id">Customer*</label>
+                        <select id="customer_id" name="customer_id" required>
+                            <option value="">Select Customer</option>
+                            {% for customer in customers %}
+                                <option value="{{ customer.id }}" {{ 'selected' if ticket and ticket.customer_id == customer.id else '' }}>
+                                    {{ customer.first_name }} {{ customer.last_name }}
+                                    {% if customer.company_name %} - {{ customer.company_name }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="septic_system_id">Septic System</label>
+                        <select id="septic_system_id" name="septic_system_id">
+                            <option value="">Select System</option>
+                            {% for system in septic_systems %}
+                                <option value="{{ system.id }}" data-customer-id="{{ system.customer_id }}" {{ 'selected' if ticket and ticket.septic_system_id == system.id else '' }}>
+                                    {{ system.system_type }} - {{ system.tank_size }} gal ({{ system.tank_material }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scheduling -->
+            <div class="form-section">
+                <h3>Scheduling & Assignment</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="scheduled_date">Scheduled Date & Time</label>
+                        <input type="datetime-local" id="scheduled_date" name="scheduled_date" 
+                               value="{{ ticket.scheduled_date.strftime('%Y-%m-%dT%H:%M') if ticket and ticket.scheduled_date else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="estimated_duration">Estimated Duration (minutes)</label>
+                        <input type="number" id="estimated_duration" name="estimated_duration" min="15" step="15" 
+                               value="{{ ticket.estimated_duration if ticket else '' }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="assigned_technician">Assigned Technician</label>
+                        <input type="text" id="assigned_technician" name="assigned_technician" 
+                               value="{{ ticket.assigned_technician if ticket else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="truck_number">Truck Number</label>
+                        <input type="text" id="truck_number" name="truck_number" 
+                               value="{{ ticket.truck_number if ticket else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pricing -->
+            <div class="form-section">
+                <h3>Pricing Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="estimated_cost">Estimated Cost</label>
+                        <input type="number" id="estimated_cost" name="estimated_cost" min="0" step="0.01" 
+                               value="{{ ticket.estimated_cost if ticket else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="actual_cost">Actual Cost</label>
+                        <input type="number" id="actual_cost" name="actual_cost" min="0" step="0.01" 
+                               value="{{ ticket.actual_cost if ticket else '' }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="labor_cost">Labor Cost</label>
+                        <input type="number" id="labor_cost" name="labor_cost" min="0" step="0.01" 
+                               value="{{ ticket.labor_cost if ticket else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="parts_cost">Parts Cost</label>
+                        <input type="number" id="parts_cost" name="parts_cost" min="0" step="0.01" 
+                               value="{{ ticket.parts_cost if ticket else '' }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="disposal_cost">Disposal Cost</label>
+                        <input type="number" id="disposal_cost" name="disposal_cost" min="0" step="0.01" 
+                               value="{{ ticket.disposal_cost if ticket else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="payment_status">Payment Status</label>
+                        <select id="payment_status" name="payment_status">
+                            <option value="pending" {{ 'selected' if ticket and ticket.payment_status == 'pending' else '' }}>Pending</option>
+                            <option value="paid" {{ 'selected' if ticket and ticket.payment_status == 'paid' else '' }}>Paid</option>
+                            <option value="overdue" {{ 'selected' if ticket and ticket.payment_status == 'overdue' else '' }}>Overdue</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Details -->
+            <div class="form-section">
+                <h3>Service Details</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gallons_pumped">Gallons Pumped</label>
+                        <input type="number" id="gallons_pumped" name="gallons_pumped" min="0" 
+                               value="{{ ticket.gallons_pumped if ticket else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="waste_type">Waste Type</label>
+                        <select id="waste_type" name="waste_type">
+                            <option value="">Select Type</option>
+                            <option value="domestic" {{ 'selected' if ticket and ticket.waste_type == 'domestic' else '' }}>Domestic</option>
+                            <option value="commercial" {{ 'selected' if ticket and ticket.waste_type == 'commercial' else '' }}>Commercial</option>
+                            <option value="industrial" {{ 'selected' if ticket and ticket.waste_type == 'industrial' else '' }}>Industrial</option>
+                            <option value="grease" {{ 'selected' if ticket and ticket.waste_type == 'grease' else '' }}>Grease</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="disposal_location">Disposal Location</label>
+                        <input type="text" id="disposal_location" name="disposal_location" 
+                               value="{{ ticket.disposal_location if ticket else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="trip_ticket_number">Trip Ticket Number</label>
+                        <input type="text" id="trip_ticket_number" name="trip_ticket_number" 
+                               value="{{ ticket.trip_ticket_number if ticket else '' }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tank_condition">Tank Condition</label>
+                        <select id="tank_condition" name="tank_condition">
+                            <option value="">Select Condition</option>
+                            <option value="excellent" {{ 'selected' if ticket and ticket.tank_condition == 'excellent' else '' }}>Excellent</option>
+                            <option value="good" {{ 'selected' if ticket and ticket.tank_condition == 'good' else '' }}>Good</option>
+                            <option value="fair" {{ 'selected' if ticket and ticket.tank_condition == 'fair' else '' }}>Fair</option>
+                            <option value="poor" {{ 'selected' if ticket and ticket.tank_condition == 'poor' else '' }}>Poor</option>
+                            <option value="critical" {{ 'selected' if ticket and ticket.tank_condition == 'critical' else '' }}>Critical</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="equipment_used">Equipment Used</label>
+                        <input type="text" id="equipment_used" name="equipment_used" 
+                               value="{{ ticket.equipment_used if ticket else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compliance -->
+            <div class="form-section">
+                <h3>Compliance & Permits</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="permit_required" name="permit_required" value="true" 
+                                   {{ 'checked' if ticket and ticket.permit_required else '' }}>
+                            Permit Required
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="permit_number">Permit Number</label>
+                        <input type="text" id="permit_number" name="permit_number" 
+                               value="{{ ticket.permit_number if ticket else '' }}">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="inspection_required" name="inspection_required" value="true" 
+                                   {{ 'checked' if ticket and ticket.inspection_required else '' }}>
+                            Inspection Required
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="inspection_passed" name="inspection_passed" value="true" 
+                                   {{ 'checked' if ticket and ticket.inspection_passed else '' }}>
+                            Inspection Passed
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-section">
+                <h3>Notes & Documentation</h3>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="office_notes">Office Notes</label>
+                        <textarea id="office_notes" name="office_notes" rows="3">{{ ticket.office_notes if ticket else '' }}</textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="technician_notes">Technician Notes</label>
+                        <textarea id="technician_notes" name="technician_notes" rows="3">{{ ticket.technician_notes if ticket else '' }}</textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="issues_found">Issues Found</label>
+                        <textarea id="issues_found" name="issues_found" rows="3">{{ ticket.issues_found if ticket else '' }}</textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="recommendations">Recommendations</label>
+                        <textarea id="recommendations" name="recommendations" rows="3">{{ ticket.recommendations if ticket else '' }}</textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="work_performed">Work Performed</label>
+                        <textarea id="work_performed" name="work_performed" rows="3">{{ ticket.work_performed if ticket else '' }}</textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="materials_used">Materials Used</label>
+                        <textarea id="materials_used" name="materials_used" rows="3">{{ ticket.materials_used if ticket else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-footer">
+            <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+            <button type="submit" class="btn btn-primary">{{ 'Update Ticket' if ticket else 'Create Ticket' }}</button>
+        </div>
+    </form>
+</div>
+
+<style>
+.ticket-form-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.form-header h2 {
+    color: #2c3e50;
+    margin: 0;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+.form-group label:has(input[type="checkbox"]) {
+    flex-direction: row;
+    align-items: center;
+    font-weight: 500;
+}
+
+.form-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 2rem 0;
+    border-top: 1px solid #ecf0f1;
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate job ID for new tickets
+    if (!document.getElementById('job_id').value) {
+        generateJobId();
+    }
+    
+    // Filter septic systems based on customer selection
+    const customerSelect = document.getElementById('customer_id');
+    const systemSelect = document.getElementById('septic_system_id');
+    
+    customerSelect.addEventListener('change', function() {
+        filterSepticSystems(this.value);
+    });
+    
+    // Initialize with current customer if editing
+    if (customerSelect.value) {
+        filterSepticSystems(customerSelect.value);
+    }
+    
+    // Form submission
+    document.getElementById('ticket-form').addEventListener('submit', handleFormSubmit);
+});
+
+function generateJobId() {
+    fetch('/api/tickets/next-id')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('job_id').value = data.job_id;
+        })
+        .catch(error => console.error('Error generating job ID:', error));
+}
+
+function filterSepticSystems(customerId) {
+    const systemSelect = document.getElementById('septic_system_id');
+    const options = systemSelect.querySelectorAll('option');
+    
+    options.forEach(option => {
+        if (option.value === '') {
+            option.style.display = 'block';
+            return;
+        }
+        
+        const optionCustomerId = option.getAttribute('data-customer-id');
+        if (customerId === '' || optionCustomerId === customerId) {
+            option.style.display = 'block';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+    
+    // Reset selection if current selection is not valid for new customer
+    const currentSelection = systemSelect.value;
+    const currentOption = systemSelect.querySelector(`option[value="${currentSelection}"]`);
+    if (currentOption && currentOption.style.display === 'none') {
+        systemSelect.value = '';
+    }
+}
+
+function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const ticketData = {};
+    
+    // Convert form data to object
+    for (let [key, value] of formData.entries()) {
+        if (value !== '') {
+            ticketData[key] = value;
+        }
+    }
+    
+    // Handle checkboxes (they won't be in formData if unchecked)
+    ['permit_required', 'inspection_required', 'inspection_passed'].forEach(field => {
+        ticketData[field] = formData.has(field);
+    });
+    
+    const ticketId = '{{ ticket.id if ticket else "" }}';
+    const isEdit = ticketId !== '';
+    const url = isEdit ? `/api/tickets/${ticketId}` : '/api/tickets';
+    const method = isEdit ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ticketData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(isEdit ? 'Ticket updated successfully!' : 'Ticket created successfully!');
+            window.location.href = `/ticket/${data.id}`;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while saving the ticket.');
+    });
+}
+</script>
+{% endblock %}

@@ -52,6 +52,11 @@ main {
     margin-bottom: 2rem;
 }
 
+.board-actions {
+    display: flex;
+    gap: 1rem;
+}
+
 .board-header h2 {
     color: #2c3e50;
     font-size: 1.5rem;
@@ -232,6 +237,12 @@ main {
 .btn-icon:hover {
     background: #f8f9fa;
     border-color: #3498db;
+}
+
+.btn-delete:hover {
+    background: #ffebee;
+    border-color: #e74c3c;
+    color: #e74c3c;
 }
 
 .job-status {

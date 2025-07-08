@@ -11,7 +11,7 @@
             <span class="priority-badge priority-{{ ticket.priority }}">{{ ticket.priority.title() }}</span>
         </div>
         <div class="ticket-actions">
-            <button class="btn btn-primary" onclick="editTicket()">Edit Ticket</button>
+            <a href="{{ url_for('edit_ticket', ticket_id=ticket.id) }}" class="btn btn-primary">Edit Ticket</a>
             <button class="btn btn-secondary" onclick="printTicket()">Print</button>
         </div>
     </div>
@@ -371,11 +371,6 @@
 </style>
 
 <script>
-function editTicket() {
-    // TODO: Implement edit functionality
-    alert('Edit functionality coming soon!');
-}
-
 function printTicket() {
     window.print();
 }

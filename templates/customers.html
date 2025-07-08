@@ -6,7 +6,10 @@
 <div class="customers-container">
     <div class="customers-header">
         <h2>Customer Management</h2>
-        <button class="btn btn-primary">+ Add Customer</button>
+        <div class="header-actions">
+            <a href="{{ url_for('create_customer') }}" class="btn btn-primary">+ Add Customer</a>
+            <a href="{{ url_for('create_septic_system') }}" class="btn btn-secondary">+ Add Septic System</a>
+        </div>
     </div>
     
     <div class="customers-table">
@@ -18,6 +21,7 @@
                     <th>Phone</th>
                     <th>Email</th>
                     <th>Address</th>
+                    <th>Systems</th>
                     <th>Last Service</th>
                     <th>Actions</th>
                 </tr>
@@ -47,6 +51,19 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if customer.septic_systems %}
+                            {{ customer.septic_systems|length }} system(s)
+                            <br><small>
+                                {% for system in customer.septic_systems[:2] %}
+                                    {{ system.system_type }}{{ ', ' if not loop.last else '' }}
+                                {% endfor %}
+                                {% if customer.septic_systems|length > 2 %}...{% endif %}
+                            </small>
+                        {% else %}
+                            <em>No systems</em>
+                        {% endif %}
+                    </td>
+                    <td>
                         {% if customer.tickets %}
                             {% set latest_ticket = customer.tickets|sort(attribute='created_at', reverse=True)|first %}
                             {{ latest_ticket.created_at.strftime('%m/%d/%Y') }}
@@ -55,8 +72,10 @@
                         {% endif %}
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-secondary">View</button>
-                        <button class="btn btn-sm btn-primary">Edit</button>
+                        <div class="action-buttons">
+                            <a href="{{ url_for('edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                            <button class="btn btn-sm btn-danger" onclick="deleteCustomer({{ customer.id }}, '{{ customer.first_name }} {{ customer.last_name }}')">Delete</button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -131,5 +150,51 @@
     font-size: 0.8rem;
     margin-right: 0.5rem;
 }
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
 </style>
+
+<script>
+function deleteCustomer(customerId, customerName) {
+    if (confirm(`Are you sure you want to delete customer "${customerName}"? This action cannot be undone.`)) {
+        fetch(`/api/customers/${customerId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('Customer deleted successfully!');
+                window.location.reload();
+            } else {
+                alert('Error deleting customer: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete customer. Please try again.');
+        });
+    }
+}
+</script>
 {% endblock %}

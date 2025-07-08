@@ -6,7 +6,10 @@
 <div class="job-board-container">
     <div class="board-header">
         <h2>Septic Job Board</h2>
-        <button id="add-job-btn" class="btn btn-primary">+ Add New Job</button>
+        <div class="board-actions">
+            <a href="{{ url_for('create_ticket') }}" class="btn btn-secondary">+ Create Detailed Ticket</a>
+            <button id="add-job-btn" class="btn btn-primary">+ Quick Add Job</button>
+        </div>
     </div>
     
     <div class="kanban-board">
