@@ -10,7 +10,7 @@ source venv/bin/activate
 export FLASK_ENV=development
 export FLASK_DEBUG=true
 export DATABASE_URL=sqlite:///truetank_dev.db
-export PORT=5000
+export PORT=5555
 
 # Run the Flask development server
 python app.py

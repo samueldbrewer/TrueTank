@@ -13,7 +13,7 @@ A web-based septic tank field service management software designed for septic se
 ./run_dev.sh
 ```
 
-The application will be available at: http://localhost:5000
+The application will be available at: http://localhost:5555
 
 ### Manual Setup
 ```bash
@@ -45,7 +45,7 @@ python app.py
 - `FLASK_ENV`: Set to `development` for local development
 - `FLASK_DEBUG`: Enable/disable debug mode
 - `DATABASE_URL`: Database connection string
-- `PORT`: Server port (defaults to 5000 locally, 8080 on Railway)
+- `PORT`: Server port (defaults to 5555 locally, 8080 on Railway)
 
 ### Project Structure
 ```
@@ -86,7 +86,7 @@ https://truetank-production.up.railway.app
 ## 🛠️ Development Workflow
 
 1. **Make changes locally** using the development server
-2. **Test thoroughly** at http://localhost:5000
+2. **Test thoroughly** at http://localhost:5555
 3. **Deploy to Railway** using `./deploy.sh`
 4. **Verify on production** at the Railway URL
 

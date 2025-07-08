@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket {{ ticket.job_id }} - TrueTank{% endblock %}
+
+{% block content %}
+<div class="ticket-detail-container">
+    <div class="ticket-header">
+        <div class="ticket-title">
+            <h2>{{ ticket.job_id }}</h2>
+            <span class="status-badge status-{{ ticket.status }}">{{ ticket.status.title().replace('-', ' ') }}</span>
+            <span class="priority-badge priority-{{ ticket.priority }}">{{ ticket.priority.title() }}</span>
+        </div>
+        <div class="ticket-actions">
+            <button class="btn btn-primary" onclick="editTicket()">Edit Ticket</button>
+            <button class="btn btn-secondary" onclick="printTicket()">Print</button>
+        </div>
+    </div>
+
+    <div class="ticket-content">
+        <div class="ticket-grid">
+            <!-- Customer Information -->
+            <div class="info-section">
+                <h3>Customer Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Name:</label>
+                        <span>{{ ticket.customer.first_name }} {{ ticket.customer.last_name if ticket.customer else 'Not assigned' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Phone:</label>
+                        <span>{{ ticket.customer.phone_primary if ticket.customer else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Email:</label>
+                        <span>{{ ticket.customer.email if ticket.customer else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Address:</label>
+                        <span>
+                            {% if ticket.customer and ticket.customer.street_address %}
+                                {{ ticket.customer.street_address }}<br>
+                                {{ ticket.customer.city }}, {{ ticket.customer.state }} {{ ticket.customer.zip_code }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="info-item">
+                        <label>Type:</label>
+                        <span>{{ ticket.customer.customer_type.title() if ticket.customer else 'N/A' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Information -->
+            <div class="info-section">
+                <h3>Service Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Service Type:</label>
+                        <span>{{ ticket.service_type or 'Not specified' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Description:</label>
+                        <span>{{ ticket.service_description or 'No description' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Assigned Technician:</label>
+                        <span>{{ ticket.assigned_technician or 'Unassigned' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Scheduled Date:</label>
+                        <span>{{ ticket.scheduled_date.strftime('%m/%d/%Y %I:%M %p') if ticket.scheduled_date else 'Not scheduled' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Estimated Duration:</label>
+                        <span>{{ ticket.estimated_duration }} minutes</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Septic System Information -->
+            {% if ticket.septic_system %}
+            <div class="info-section">
+                <h3>Septic System Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>System Type:</label>
+                        <span>{{ ticket.septic_system.system_type or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Tank Size:</label>
+                        <span>{{ ticket.septic_system.tank_size }} gallons</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Tank Material:</label>
+                        <span>{{ ticket.septic_system.tank_material or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Compartments:</label>
+                        <span>{{ ticket.septic_system.num_compartments or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Condition:</label>
+                        <span>{{ ticket.septic_system.system_condition or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Access Notes:</label>
+                        <span>{{ ticket.septic_system.access_notes or 'None' }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Pricing Information -->
+            <div class="info-section">
+                <h3>Pricing Information</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Estimated Cost:</label>
+                        <span>${{ '%.2f'|format(ticket.estimated_cost) if ticket.estimated_cost else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Actual Cost:</label>
+                        <span>${{ '%.2f'|format(ticket.actual_cost) if ticket.actual_cost else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Labor Cost:</label>
+                        <span>${{ '%.2f'|format(ticket.labor_cost) if ticket.labor_cost else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Parts Cost:</label>
+                        <span>${{ '%.2f'|format(ticket.parts_cost) if ticket.parts_cost else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Disposal Cost:</label>
+                        <span>${{ '%.2f'|format(ticket.disposal_cost) if ticket.disposal_cost else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Payment Status:</label>
+                        <span class="payment-status payment-{{ ticket.payment_status }}">
+                            {{ ticket.payment_status.title() if ticket.payment_status else 'Pending' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service Details -->
+            <div class="info-section">
+                <h3>Service Details</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Gallons Pumped:</label>
+                        <span>{{ ticket.gallons_pumped or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Waste Type:</label>
+                        <span>{{ ticket.waste_type or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Disposal Location:</label>
+                        <span>{{ ticket.disposal_location or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Trip Ticket #:</label>
+                        <span>{{ ticket.trip_ticket_number or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Tank Condition:</label>
+                        <span>{{ ticket.tank_condition or 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Equipment Used:</label>
+                        <span>{{ ticket.equipment_used or 'N/A' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time Tracking -->
+            <div class="info-section">
+                <h3>Time Tracking</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Start Time:</label>
+                        <span>{{ ticket.start_time.strftime('%m/%d/%Y %I:%M %p') if ticket.start_time else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>End Time:</label>
+                        <span>{{ ticket.end_time.strftime('%m/%d/%Y %I:%M %p') if ticket.end_time else 'N/A' }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Work Time:</label>
+                        <span>{{ ticket.work_time }} minutes</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Travel Time:</label>
+                        <span>{{ ticket.travel_time }} minutes</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div class="notes-section">
+            <div class="notes-grid">
+                <div class="note-item">
+                    <h4>Office Notes</h4>
+                    <p>{{ ticket.office_notes or 'No notes' }}</p>
+                </div>
+                <div class="note-item">
+                    <h4>Technician Notes</h4>
+                    <p>{{ ticket.technician_notes or 'No notes' }}</p>
+                </div>
+                <div class="note-item">
+                    <h4>Issues Found</h4>
+                    <p>{{ ticket.issues_found or 'No issues reported' }}</p>
+                </div>
+                <div class="note-item">
+                    <h4>Recommendations</h4>
+                    <p>{{ ticket.recommendations or 'No recommendations' }}</p>
+                </div>
+                <div class="note-item">
+                    <h4>Work Performed</h4>
+                    <p>{{ ticket.work_performed or 'No work details' }}</p>
+                </div>
+                <div class="note-item">
+                    <h4>Materials Used</h4>
+                    <p>{{ ticket.materials_used or 'No materials listed' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.ticket-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.ticket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.ticket-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ticket-title h2 {
+    color: #2c3e50;
+    margin: 0;
+}
+
+.ticket-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.ticket-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.info-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.info-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.info-item label {
+    font-weight: 600;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.info-item span {
+    color: #2c3e50;
+}
+
+.notes-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.note-item h4 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.note-item p {
+    color: #7f8c8d;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.payment-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.payment-pending {
+    background-color: #f39c12;
+    color: white;
+}
+
+.payment-paid {
+    background-color: #27ae60;
+    color: white;
+}
+
+.payment-overdue {
+    background-color: #e74c3c;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .ticket-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .ticket-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .notes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function editTicket() {
+    // TODO: Implement edit functionality
+    alert('Edit functionality coming soon!');
+}
+
+function printTicket() {
+    window.print();
+}
+</script>
+{% endblock %}

@@ -26,7 +26,7 @@ if [ ! -f ".env" ]; then
 FLASK_ENV=development
 FLASK_DEBUG=true
 DATABASE_URL=sqlite:///truetank_dev.db
-PORT=5000
+PORT=5555
 EOF
 fi
 

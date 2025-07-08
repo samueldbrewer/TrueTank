@@ -56,18 +56,67 @@ function createJobCardFromTicket(ticket) {
     jobCard.dataset.jobId = ticket.job_id;
     jobCard.dataset.ticketId = ticket.id;
     
+    // Calculate time info
+    const scheduledDate = ticket.scheduled_date ? new Date(ticket.scheduled_date).toLocaleDateString() : 'Not scheduled';
+    const estimatedCost = ticket.estimated_cost ? `$${ticket.estimated_cost.toFixed(2)}` : 'TBD';
+    const duration = ticket.estimated_duration ? `${ticket.estimated_duration} min` : 'TBD';
+    
     jobCard.innerHTML = `
-        <h4>${ticket.service_type || 'Septic Service'}</h4>
-        <p class="job-id">Job ID: ${ticket.job_id}</p>
-        <p>Customer: ${ticket.customer_name || '[Not assigned]'}</p>
-        <p>Service: ${ticket.service_type || '[Not specified]'}</p>
-        <span class="job-status status-${ticket.status}">${ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).replace('-', ' ')}</span>
+        <div class="card-header">
+            <h4>${ticket.service_type || 'Septic Service'}</h4>
+            <span class="job-id">${ticket.job_id}</span>
+        </div>
+        <div class="card-body">
+            <div class="customer-info">
+                <strong>${ticket.customer_name || '[Not assigned]'}</strong>
+                ${ticket.customer_phone ? `<br><small>${ticket.customer_phone}</small>` : ''}
+            </div>
+            <div class="service-details">
+                <div class="detail-item">
+                    <span class="label">Scheduled:</span>
+                    <span class="value">${scheduledDate}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Technician:</span>
+                    <span class="value">${ticket.assigned_technician || 'Unassigned'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Cost:</span>
+                    <span class="value">${estimatedCost}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Duration:</span>
+                    <span class="value">${duration}</span>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <span class="job-status status-${ticket.status}">${ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).replace('-', ' ')}</span>
+            <span class="priority-badge priority-${ticket.priority}">${ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}</span>
+        </div>
+        <div class="card-actions">
+            <button class="btn-icon" onclick="viewTicketDetails(${ticket.id})" title="View Details">
+                <i class="icon-eye">👁️</i>
+            </button>
+            <button class="btn-icon" onclick="editTicket(${ticket.id})" title="Edit">
+                <i class="icon-edit">✏️</i>
+            </button>
+        </div>
     `;
     
     container.appendChild(jobCard);
     
     // Add drag event listeners to the card
     addDragEventListeners(jobCard);
+}
+
+function viewTicketDetails(ticketId) {
+    window.location.href = `/ticket/${ticketId}`;
+}
+
+function editTicket(ticketId) {
+    // TODO: Implement edit functionality
+    alert('Edit functionality coming soon!');
 }
 
 function createBlankJobCard() {

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Customers - TrueTank{% endblock %}
+
+{% block content %}
+<div class="customers-container">
+    <div class="customers-header">
+        <h2>Customer Management</h2>
+        <button class="btn btn-primary">+ Add Customer</button>
+    </div>
+    
+    <div class="customers-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                    <th>Last Service</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for customer in customers %}
+                <tr>
+                    <td>
+                        <strong>{{ customer.first_name }} {{ customer.last_name }}</strong>
+                        {% if customer.company_name %}
+                            <br><small>{{ customer.company_name }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="type-badge type-{{ customer.customer_type }}">
+                            {{ customer.customer_type.title() }}
+                        </span>
+                    </td>
+                    <td>{{ customer.phone_primary or 'N/A' }}</td>
+                    <td>{{ customer.email or 'N/A' }}</td>
+                    <td>
+                        {% if customer.street_address %}
+                            {{ customer.street_address }}<br>
+                            <small>{{ customer.city }}, {{ customer.state }} {{ customer.zip_code }}</small>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if customer.tickets %}
+                            {% set latest_ticket = customer.tickets|sort(attribute='created_at', reverse=True)|first %}
+                            {{ latest_ticket.created_at.strftime('%m/%d/%Y') }}
+                        {% else %}
+                            No service history
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary">View</button>
+                        <button class="btn btn-sm btn-primary">Edit</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+.customers-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.customers-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.customers-header h2 {
+    color: #2c3e50;
+}
+
+.customers-table {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.customers-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.customers-table th,
+.customers-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.customers-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.type-residential {
+    background-color: #3498db;
+    color: white;
+}
+
+.type-commercial {
+    background-color: #e67e22;
+    color: white;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %}
