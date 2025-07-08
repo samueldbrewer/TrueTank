@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Database - TrueTank{% endblock %}
+
+{% block content %}
+<div class="database-container">
+    <div class="database-header">
+        <h2>Ticket Database</h2>
+        <p>All septic service tickets in the system</p>
+    </div>
+    
+    <div class="database-stats">
+        <div class="stat-card">
+            <h3>{{ tickets|length }}</h3>
+            <p>Total Tickets</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ tickets|selectattr('status', 'equalto', 'pending')|list|length }}</h3>
+            <p>Pending</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ tickets|selectattr('status', 'equalto', 'in-progress')|list|length }}</h3>
+            <p>In Progress</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ tickets|selectattr('status', 'equalto', 'completed')|list|length }}</h3>
+            <p>Completed</p>
+        </div>
+    </div>
+    
+    <div class="database-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Job ID</th>
+                    <th>Customer</th>
+                    <th>Service Type</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Technician</th>
+                    <th>Est. Cost</th>
+                    <th>Actual Cost</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in tickets %}
+                <tr>
+                    <td class="job-id">{{ ticket.job_id }}</td>
+                    <td>
+                        <div class="customer-info">
+                            <strong>{{ ticket.customer_name or 'Not assigned' }}</strong>
+                            {% if ticket.customer_phone %}
+                                <br><small>{{ ticket.customer_phone }}</small>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>{{ ticket.service_type or 'Not specified' }}</td>
+                    <td>
+                        <span class="status-badge status-{{ ticket.status }}">
+                            {{ ticket.status.title().replace('-', ' ') }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="priority-badge priority-{{ ticket.priority }}">
+                            {{ ticket.priority.title() }}
+                        </span>
+                    </td>
+                    <td>{{ ticket.assigned_technician or 'Unassigned' }}</td>
+                    <td>{{ '$%.2f'|format(ticket.estimated_cost) if ticket.estimated_cost else 'N/A' }}</td>
+                    <td>{{ '$%.2f'|format(ticket.actual_cost) if ticket.actual_cost else 'N/A' }}</td>
+                    <td>{{ ticket.created_at.strftime('%m/%d/%Y') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not tickets %}
+        <div class="empty-state">
+            <p>No tickets found in the database.</p>
+            <a href="{{ url_for('job_board') }}" class="btn btn-primary">Create Your First Ticket</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.database-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.database-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.database-header h2 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.database-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-card h3 {
+    font-size: 2rem;
+    color: #3498db;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card p {
+    color: #7f8c8d;
+    font-weight: 500;
+}
+
+.database-table {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #f8f9fa;
+}
+
+th, td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+}
+
+th {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.job-id {
+    font-weight: bold;
+    color: #3498db;
+}
+
+.customer-info strong {
+    color: #2c3e50;
+}
+
+.customer-info small {
+    color: #7f8c8d;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-pending {
+    background-color: #f39c12;
+    color: white;
+}
+
+.status-in-progress {
+    background-color: #3498db;
+    color: white;
+}
+
+.status-completed {
+    background-color: #27ae60;
+    color: white;
+}
+
+.priority-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.priority-high {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.priority-medium {
+    background-color: #f39c12;
+    color: white;
+}
+
+.priority-low {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #7f8c8d;
+}
+
+.empty-state p {
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+    .database-table {
+        overflow-x: auto;
+    }
+    
+    table {
+        min-width: 800px;
+    }
+}
+</style>
+{% endblock %}
