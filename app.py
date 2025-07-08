@@ -1,10 +1,14 @@
-from flask import Flask
+from flask import Flask, render_template
 
 app = Flask(__name__)
 
 @app.route('/')
-def hello():
-    return 'TrueTank - Septic Service Management System'
+def index():
+    return render_template('index.html')
+
+@app.route('/job-board')
+def job_board():
+    return render_template('job_board.html')
 
 @app.route('/health')
 def health():

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Job Board - TrueTank{% endblock %}
+
+{% block content %}
+<div class="job-board-container">
+    <div class="board-header">
+        <h2>Septic Job Board</h2>
+        <button id="add-job-btn" class="btn btn-primary">+ Add New Job</button>
+    </div>
+    
+    <div class="kanban-board">
+        <div class="column" id="pending-column">
+            <h3>Pending</h3>
+            <div class="card-container" data-status="pending">
+                <!-- Cards will be added here -->
+            </div>
+        </div>
+        
+        <div class="column" id="in-progress-column">
+            <h3>In Progress</h3>
+            <div class="card-container" data-status="in-progress">
+                <!-- Cards will be added here -->
+            </div>
+        </div>
+        
+        <div class="column" id="completed-column">
+            <h3>Completed</h3>
+            <div class="card-container" data-status="completed">
+                <!-- Cards will be added here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/job_board.js') }}"></script>
+{% endblock %}

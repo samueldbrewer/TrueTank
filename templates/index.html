@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard">
+    <h2>Welcome to TrueTank</h2>
+    <p>Your septic service management system</p>
+    
+    <div class="dashboard-cards">
+        <div class="card">
+            <h3>Job Board</h3>
+            <p>Manage and track septic service jobs</p>
+            <a href="{{ url_for('job_board') }}" class="btn btn-primary">View Job Board</a>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.dashboard h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.card {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.card p {
+    color: #7f8c8d;
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}
