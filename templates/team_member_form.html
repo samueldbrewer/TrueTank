@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit Team Member' if team_member else 'Add Team Member' }} - TrueTank{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-header">
+        <h2>{{ 'Edit Team Member' if team_member else 'Add Team Member' }}</h2>
+        <div class="form-actions">
+            <a href="{{ url_for('team_manager') }}" class="btn btn-secondary">← Back to Team</a>
+        </div>
+    </div>
+
+    <form id="team-member-form" class="ticket-form">
+        {% if team_member %}
+            <input type="hidden" id="member-id" value="{{ team_member.id }}">
+        {% endif %}
+        
+        <div class="form-grid">
+            <!-- Basic Information -->
+            <div class="form-section">
+                <h3>Basic Information</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="first_name">First Name *</label>
+                        <input type="text" id="first_name" name="first_name" value="{{ team_member.first_name if team_member else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="last_name">Last Name *</label>
+                        <input type="text" id="last_name" name="last_name" value="{{ team_member.last_name if team_member else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="employee_id">Employee ID</label>
+                        <input type="text" id="employee_id" name="employee_id" value="{{ team_member.employee_id if team_member else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="form-section">
+                <h3>Contact Information</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phone_primary">Primary Phone</label>
+                        <input type="tel" id="phone_primary" name="phone_primary" value="{{ team_member.phone_primary if team_member else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone_secondary">Secondary Phone</label>
+                        <input type="tel" id="phone_secondary" name="phone_secondary" value="{{ team_member.phone_secondary if team_member else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" value="{{ team_member.email if team_member else '' }}">
+                </div>
+            </div>
+
+            <!-- Home Address -->
+            <div class="form-section">
+                <h3>Home Address</h3>
+                
+                <div class="form-group">
+                    <label for="home_street_address">Street Address</label>
+                    <input type="text" id="home_street_address" name="home_street_address" value="{{ team_member.home_street_address if team_member else '' }}">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="home_city">City</label>
+                        <input type="text" id="home_city" name="home_city" value="{{ team_member.home_city if team_member else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="home_state">State</label>
+                        <input type="text" id="home_state" name="home_state" value="{{ team_member.home_state if team_member else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="home_zip_code">ZIP Code</label>
+                        <input type="text" id="home_zip_code" name="home_zip_code" value="{{ team_member.home_zip_code if team_member else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contact -->
+            <div class="form-section">
+                <h3>Emergency Contact</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="emergency_contact_name">Emergency Contact Name</label>
+                        <input type="text" id="emergency_contact_name" name="emergency_contact_name" value="{{ team_member.emergency_contact_name if team_member else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="emergency_contact_phone">Emergency Contact Phone</label>
+                        <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone" value="{{ team_member.emergency_contact_phone if team_member else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="emergency_contact_relationship">Relationship</label>
+                    <select id="emergency_contact_relationship" name="emergency_contact_relationship">
+                        <option value="">Select relationship...</option>
+                        <option value="Spouse" {{ 'selected' if team_member and team_member.emergency_contact_relationship == 'Spouse' else '' }}>Spouse</option>
+                        <option value="Parent" {{ 'selected' if team_member and team_member.emergency_contact_relationship == 'Parent' else '' }}>Parent</option>
+                        <option value="Child" {{ 'selected' if team_member and team_member.emergency_contact_relationship == 'Child' else '' }}>Child</option>
+                        <option value="Sibling" {{ 'selected' if team_member and team_member.emergency_contact_relationship == 'Sibling' else '' }}>Sibling</option>
+                        <option value="Friend" {{ 'selected' if team_member and team_member.emergency_contact_relationship == 'Friend' else '' }}>Friend</option>
+                        <option value="Other" {{ 'selected' if team_member and team_member.emergency_contact_relationship == 'Other' else '' }}>Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Employment Information -->
+            <div class="form-section">
+                <h3>Employment Information</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="position">Position</label>
+                        <select id="position" name="position">
+                            <option value="">Select position...</option>
+                            <option value="Senior Technician" {{ 'selected' if team_member and team_member.position == 'Senior Technician' else '' }}>Senior Technician</option>
+                            <option value="Technician" {{ 'selected' if team_member and team_member.position == 'Technician' else '' }}>Technician</option>
+                            <option value="Driver/Helper" {{ 'selected' if team_member and team_member.position == 'Driver/Helper' else '' }}>Driver/Helper</option>
+                            <option value="Office Manager" {{ 'selected' if team_member and team_member.position == 'Office Manager' else '' }}>Office Manager</option>
+                            <option value="Supervisor" {{ 'selected' if team_member and team_member.position == 'Supervisor' else '' }}>Supervisor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="department">Department</label>
+                        <select id="department" name="department">
+                            <option value="field_service" {{ 'selected' if team_member and team_member.department == 'field_service' else '' }}>Field Service</option>
+                            <option value="office" {{ 'selected' if team_member and team_member.department == 'office' else '' }}>Office</option>
+                            <option value="management" {{ 'selected' if team_member and team_member.department == 'management' else '' }}>Management</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="hire_date">Hire Date</label>
+                        <input type="date" id="hire_date" name="hire_date" value="{{ team_member.hire_date.isoformat() if team_member and team_member.hire_date else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="employment_status">Employment Status</label>
+                        <select id="employment_status" name="employment_status">
+                            <option value="active" {{ 'selected' if team_member and team_member.employment_status == 'active' else '' }}>Active</option>
+                            <option value="inactive" {{ 'selected' if team_member and team_member.employment_status == 'inactive' else '' }}>Inactive</option>
+                            <option value="terminated" {{ 'selected' if team_member and team_member.employment_status == 'terminated' else '' }}>Terminated</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certifications & Licenses -->
+            <div class="form-section">
+                <h3>Certifications & Licenses</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="checkbox" id="cdl_license" name="cdl_license" {{ 'checked' if team_member and team_member.cdl_license else '' }}>
+                        <label for="cdl_license">CDL License</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="cdl_expiry">CDL Expiry Date</label>
+                        <input type="date" id="cdl_expiry" name="cdl_expiry" value="{{ team_member.cdl_expiry.isoformat() if team_member and team_member.cdl_expiry else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="checkbox" id="septic_certification" name="septic_certification" {{ 'checked' if team_member and team_member.septic_certification else '' }}>
+                        <label for="septic_certification">Septic Certification</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="septic_cert_expiry">Septic Cert Expiry Date</label>
+                        <input type="date" id="septic_cert_expiry" name="septic_cert_expiry" value="{{ team_member.septic_cert_expiry.isoformat() if team_member and team_member.septic_cert_expiry else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="other_certifications">Other Certifications</label>
+                    <textarea id="other_certifications" name="other_certifications" rows="3" placeholder="List any other certifications or licenses...">{{ team_member.other_certifications if team_member else '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Work Schedule -->
+            <div class="form-section">
+                <h3>Work Schedule</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="shift_start_time">Shift Start Time</label>
+                        <input type="time" id="shift_start_time" name="shift_start_time" value="{{ team_member.shift_start_time.strftime('%H:%M') if team_member and team_member.shift_start_time else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="shift_end_time">Shift End Time</label>
+                        <input type="time" id="shift_end_time" name="shift_end_time" value="{{ team_member.shift_end_time.strftime('%H:%M') if team_member and team_member.shift_end_time else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="work_days">Work Days</label>
+                    <select id="work_days" name="work_days">
+                        <option value="weekdays" {{ 'selected' if team_member and team_member.work_days == 'weekdays' else '' }}>Weekdays</option>
+                        <option value="weekends" {{ 'selected' if team_member and team_member.work_days == 'weekends' else '' }}>Weekends</option>
+                        <option value="all" {{ 'selected' if team_member and team_member.work_days == 'all' else '' }}>All Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Permissions & Notes -->
+            <div class="form-section">
+                <h3>Permissions & Notes</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="checkbox" id="is_supervisor" name="is_supervisor" {{ 'checked' if team_member and team_member.is_supervisor else '' }}>
+                        <label for="is_supervisor">Is Supervisor</label>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="can_operate_trucks" name="can_operate_trucks" {{ 'checked' if team_member and team_member.can_operate_trucks else 'checked' }}>
+                        <label for="can_operate_trucks">Can Operate Trucks</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" name="notes" rows="3" placeholder="Additional notes about this team member...">{{ team_member.notes if team_member else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Update Team Member' if team_member else 'Add Team Member' }}</button>
+            <a href="{{ url_for('team_manager') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('team-member-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+        
+        const memberId = document.getElementById('member-id');
+        const isEdit = memberId && memberId.value;
+        
+        if (isEdit) {
+            // Update existing team member
+            fetch(`/api/team-members/${memberId.value}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error updating team member: ' + result.error);
+                } else {
+                    alert('Team member updated successfully!');
+                    window.location.href = '/team';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update team member. Please try again.');
+            });
+        } else {
+            // Create new team member
+            fetch('/api/team-members', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert('Error creating team member: ' + result.error);
+                } else {
+                    alert('Team member added successfully!');
+                    window.location.href = '/team';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to add team member. Please try again.');
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

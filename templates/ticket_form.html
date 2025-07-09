@@ -49,6 +49,10 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label for="requested_service_date">Requested Service By</label>
+                        <input type="date" id="requested_service_date" name="requested_service_date" value="{{ ticket.requested_service_date.isoformat() if ticket and ticket.requested_service_date else '' }}">
+                    </div>
+                    <div class="form-group">
                         <label for="status">Status*</label>
                         <select id="status" name="status" required>
                             <option value="pending" {{ 'selected' if ticket and ticket.status == 'pending' else '' }}>Pending</option>
@@ -71,9 +75,9 @@
             <!-- Customer & System Selection -->
             <div class="form-section">
                 <h3>Customer & System</h3>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="customer_id">Customer*</label>
+                <div class="form-group">
+                    <label for="customer_id">Customer*</label>
+                    <div class="input-with-button">
                         <select id="customer_id" name="customer_id" required>
                             <option value="">Select Customer</option>
                             {% for customer in customers %}
@@ -83,9 +87,12 @@
                                 </option>
                             {% endfor %}
                         </select>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="openNewCustomerModal()">+ New</button>
                     </div>
-                    <div class="form-group">
-                        <label for="septic_system_id">Septic System</label>
+                </div>
+                <div class="form-group">
+                    <label for="septic_system_id">Septic System</label>
+                    <div class="input-with-button">
                         <select id="septic_system_id" name="septic_system_id">
                             <option value="">Select System</option>
                             {% for system in septic_systems %}
@@ -94,6 +101,7 @@
                                 </option>
                             {% endfor %}
                         </select>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="openNewSystemModal()" id="new-system-btn" disabled>+ New</button>
                     </div>
                 </div>
             </div>
@@ -423,7 +431,203 @@
         gap: 1rem;
     }
 }
+
+.input-with-button {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.input-with-button select {
+    flex: 1;
+}
+
+.btn-sm {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ecf0f1;
+}
 </style>
+
+<!-- New Customer Modal -->
+<div id="newCustomerModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Customer</h3>
+            <span class="close" onclick="closeNewCustomerModal()">&times;</span>
+        </div>
+        
+        <form id="newCustomerForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="modal_first_name">First Name *</label>
+                    <input type="text" id="modal_first_name" name="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="modal_last_name">Last Name *</label>
+                    <input type="text" id="modal_last_name" name="last_name" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="modal_company_name">Company Name</label>
+                    <input type="text" id="modal_company_name" name="company_name">
+                </div>
+                <div class="form-group">
+                    <label for="modal_phone_primary">Phone</label>
+                    <input type="tel" id="modal_phone_primary" name="phone_primary">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="modal_email">Email</label>
+                <input type="email" id="modal_email" name="email">
+            </div>
+            
+            <div class="form-group">
+                <label for="modal_property_address">Property Address *</label>
+                <input type="text" id="modal_property_address" name="property_address" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="modal_property_city">City *</label>
+                    <input type="text" id="modal_property_city" name="property_city" required>
+                </div>
+                <div class="form-group">
+                    <label for="modal_property_state">State *</label>
+                    <input type="text" id="modal_property_state" name="property_state" required>
+                </div>
+                <div class="form-group">
+                    <label for="modal_property_zip">ZIP *</label>
+                    <input type="text" id="modal_property_zip" name="property_zip" required>
+                </div>
+            </div>
+        </form>
+        
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeNewCustomerModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveNewCustomer()">Add Customer</button>
+        </div>
+    </div>
+</div>
+
+<!-- New Septic System Modal -->
+<div id="newSystemModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add New Septic System</h3>
+            <span class="close" onclick="closeNewSystemModal()">&times;</span>
+        </div>
+        
+        <form id="newSystemForm">
+            <input type="hidden" id="modal_customer_id" name="customer_id">
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="modal_system_type">System Type *</label>
+                    <select id="modal_system_type" name="system_type" required>
+                        <option value="">Select Type</option>
+                        <option value="conventional">Conventional</option>
+                        <option value="aerobic">Aerobic</option>
+                        <option value="advanced_treatment">Advanced Treatment</option>
+                        <option value="chamber">Chamber</option>
+                        <option value="lagoon">Lagoon</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="modal_tank_size">Tank Size (gallons) *</label>
+                    <input type="number" id="modal_tank_size" name="tank_size" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="modal_tank_material">Tank Material</label>
+                    <select id="modal_tank_material" name="tank_material">
+                        <option value="concrete">Concrete</option>
+                        <option value="plastic">Plastic</option>
+                        <option value="fiberglass">Fiberglass</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="modal_num_compartments">Compartments</label>
+                    <input type="number" id="modal_num_compartments" name="num_compartments" min="1" max="5" value="1">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="modal_access_notes">Access Notes</label>
+                <textarea id="modal_access_notes" name="access_notes" rows="3" placeholder="How to access the system, gate codes, etc."></textarea>
+            </div>
+        </form>
+        
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeNewSystemModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveNewSystem()">Add System</button>
+        </div>
+    </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -461,6 +665,12 @@ function generateJobId() {
 function filterSepticSystems(customerId) {
     const systemSelect = document.getElementById('septic_system_id');
     const options = systemSelect.querySelectorAll('option');
+    
+    // If no customerId is provided, get it from the customer select
+    if (!customerId) {
+        const customerSelect = document.getElementById('customer_id');
+        customerId = customerSelect.value;
+    }
     
     options.forEach(option => {
         if (option.value === '') {
@@ -528,5 +738,142 @@ function handleFormSubmit(e) {
         alert('An error occurred while saving the ticket.');
     });
 }
+
+// Modal functions for creating new customers and systems
+function openNewCustomerModal() {
+    document.getElementById('newCustomerModal').style.display = 'block';
+}
+
+function closeNewCustomerModal() {
+    document.getElementById('newCustomerModal').style.display = 'none';
+    document.getElementById('newCustomerForm').reset();
+}
+
+function openNewSystemModal() {
+    const customerSelect = document.getElementById('customer_id');
+    if (!customerSelect.value) {
+        alert('Please select a customer first');
+        return;
+    }
+    
+    document.getElementById('modal_customer_id').value = customerSelect.value;
+    document.getElementById('newSystemModal').style.display = 'block';
+}
+
+function closeNewSystemModal() {
+    document.getElementById('newSystemModal').style.display = 'none';
+    document.getElementById('newSystemForm').reset();
+}
+
+function saveNewCustomer() {
+    const form = document.getElementById('newCustomerForm');
+    const formData = new FormData(form);
+    const customerData = {};
+    
+    for (let [key, value] of formData.entries()) {
+        customerData[key] = value;
+    }
+    
+    fetch('/api/customers', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(customerData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error creating customer: ' + data.error);
+        } else {
+            // Add new customer to the select dropdown
+            const customerSelect = document.getElementById('customer_id');
+            const option = document.createElement('option');
+            option.value = data.id;
+            option.textContent = `${data.first_name} ${data.last_name}`;
+            if (data.company_name) {
+                option.textContent += ` - ${data.company_name}`;
+            }
+            option.selected = true;
+            customerSelect.appendChild(option);
+            
+            // Enable the "New System" button
+            document.getElementById('new-system-btn').disabled = false;
+            
+            // Update system dropdown to show systems for this customer
+            filterSepticSystems(data.id);
+            
+            closeNewCustomerModal();
+            alert('Customer added successfully!');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create customer. Please try again.');
+    });
+}
+
+function saveNewSystem() {
+    const form = document.getElementById('newSystemForm');
+    const formData = new FormData(form);
+    const systemData = {};
+    
+    for (let [key, value] of formData.entries()) {
+        systemData[key] = value;
+    }
+    
+    fetch('/api/septic-systems', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(systemData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error creating septic system: ' + data.error);
+        } else {
+            // Add new system to the select dropdown
+            const systemSelect = document.getElementById('septic_system_id');
+            const option = document.createElement('option');
+            option.value = data.id;
+            option.setAttribute('data-customer-id', data.customer_id);
+            option.textContent = `${data.system_type} - ${data.tank_size} gal (${data.tank_material})`;
+            option.selected = true;
+            systemSelect.appendChild(option);
+            
+            // Update system visibility - pass the customer ID to show only relevant systems
+            const customerSelect = document.getElementById('customer_id');
+            filterSepticSystems(customerSelect.value);
+            
+            closeNewSystemModal();
+            alert('Septic system added successfully!');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create septic system. Please try again.');
+    });
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const customerModal = document.getElementById('newCustomerModal');
+    const systemModal = document.getElementById('newSystemModal');
+    
+    if (event.target === customerModal) {
+        closeNewCustomerModal();
+    }
+    if (event.target === systemModal) {
+        closeNewSystemModal();
+    }
+}
+
+// Enable/disable "New System" button based on customer selection
+document.getElementById('customer_id').addEventListener('change', function() {
+    const newSystemBtn = document.getElementById('new-system-btn');
+    newSystemBtn.disabled = !this.value;
+});
 </script>
 {% endblock %}

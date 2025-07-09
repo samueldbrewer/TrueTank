@@ -1,7 +1,8 @@
 import os
 from flask import Flask, render_template, request, jsonify
-from models import db, Ticket, Customer, SepticSystem, ServiceHistory
+from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -76,6 +77,48 @@ def edit_septic_system(system_id):
     septic_system = SepticSystem.query.get_or_404(system_id)
     customers = Customer.query.all()
     return render_template('septic_system_form.html', septic_system=septic_system, customers=customers)
+
+# Fleet Management Routes
+@app.route('/fleet')
+def fleet_manager():
+    trucks = Truck.query.all()
+    locations = Location.query.filter_by(is_active=True).all()
+    return render_template('fleet_manager.html', trucks=trucks, locations=locations)
+
+@app.route('/truck/create')
+def create_truck():
+    locations = Location.query.filter_by(is_active=True).all()
+    return render_template('truck_form.html', locations=locations)
+
+@app.route('/truck/<int:truck_id>/edit')
+def edit_truck(truck_id):
+    truck = Truck.query.get_or_404(truck_id)
+    locations = Location.query.filter_by(is_active=True).all()
+    return render_template('truck_form.html', truck=truck, locations=locations)
+
+@app.route('/location/create')
+def create_location():
+    return render_template('location_form.html')
+
+@app.route('/location/<int:location_id>/edit')
+def edit_location(location_id):
+    location = Location.query.get_or_404(location_id)
+    return render_template('location_form.html', location=location)
+
+# Team Management Routes
+@app.route('/team')
+def team_manager():
+    team_members = TeamMember.query.all()
+    return render_template('team_manager.html', team_members=team_members)
+
+@app.route('/team-member/create')
+def create_team_member():
+    return render_template('team_member_form.html')
+
+@app.route('/team-member/<int:member_id>/edit')
+def edit_team_member(member_id):
+    team_member = TeamMember.query.get_or_404(member_id)
+    return render_template('team_member_form.html', team_member=team_member)
 
 @app.route('/api/tickets', methods=['GET'])
 def get_tickets():
@@ -708,6 +751,310 @@ def delete_ticket_api(ticket_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# Fleet Management APIs
+@app.route('/api/trucks', methods=['GET'])
+def get_trucks():
+    trucks = Truck.query.all()
+    return jsonify([truck.to_dict() for truck in trucks])
+
+@app.route('/api/trucks', methods=['POST'])
+def create_truck_api():
+    try:
+        data = request.get_json()
+        
+        def safe_int(value):
+            try:
+                return int(value) if value and value != '' else None
+            except (ValueError, TypeError):
+                return None
+                
+        def safe_float(value):
+            try:
+                return float(value) if value and value != '' else None
+            except (ValueError, TypeError):
+                return None
+                
+        def safe_bool(value):
+            return value in [True, 'true', 'True', '1', 1]
+        
+        # Parse dates
+        purchase_date = None
+        if data.get('purchase_date'):
+            try:
+                from datetime import datetime
+                purchase_date = datetime.fromisoformat(data.get('purchase_date')).date()
+            except ValueError:
+                pass
+        
+        last_maintenance = None
+        if data.get('last_maintenance'):
+            try:
+                from datetime import datetime
+                last_maintenance = datetime.fromisoformat(data.get('last_maintenance')).date()
+            except ValueError:
+                pass
+                
+        next_maintenance_due = None
+        if data.get('next_maintenance_due'):
+            try:
+                from datetime import datetime
+                next_maintenance_due = datetime.fromisoformat(data.get('next_maintenance_due')).date()
+            except ValueError:
+                pass
+        
+        insurance_expiry = None
+        if data.get('insurance_expiry'):
+            try:
+                from datetime import datetime
+                insurance_expiry = datetime.fromisoformat(data.get('insurance_expiry')).date()
+            except ValueError:
+                pass
+                
+        registration_expiry = None
+        if data.get('registration_expiry'):
+            try:
+                from datetime import datetime
+                registration_expiry = datetime.fromisoformat(data.get('registration_expiry')).date()
+            except ValueError:
+                pass
+        
+        truck = Truck(
+            truck_number=data.get('truck_number'),
+            license_plate=data.get('license_plate'),
+            vin=data.get('vin'),
+            make=data.get('make'),
+            model=data.get('model'),
+            year=safe_int(data.get('year')),
+            color=data.get('color'),
+            tank_capacity=safe_int(data.get('tank_capacity')),
+            tank_material=data.get('tank_material', 'aluminum'),
+            num_compartments=safe_int(data.get('num_compartments', 1)),
+            pump_type=data.get('pump_type'),
+            pump_cfm=safe_int(data.get('pump_cfm')),
+            hose_length=safe_int(data.get('hose_length')),
+            hose_diameter=safe_float(data.get('hose_diameter')),
+            has_hose_reel=safe_bool(data.get('has_hose_reel')),
+            has_pressure_washer=safe_bool(data.get('has_pressure_washer')),
+            has_camera_system=safe_bool(data.get('has_camera_system')),
+            has_gps_tracking=safe_bool(data.get('has_gps_tracking')),
+            special_equipment=data.get('special_equipment'),
+            status=data.get('status', 'active'),
+            current_location_id=safe_int(data.get('current_location_id')),
+            current_mileage=safe_int(data.get('current_mileage')),
+            engine_hours=safe_float(data.get('engine_hours')),
+            last_maintenance=last_maintenance,
+            next_maintenance_due=next_maintenance_due,
+            maintenance_interval_miles=safe_int(data.get('maintenance_interval_miles', 5000)),
+            maintenance_interval_hours=safe_int(data.get('maintenance_interval_hours', 250)),
+            insurance_company=data.get('insurance_company'),
+            insurance_policy=data.get('insurance_policy'),
+            insurance_expiry=insurance_expiry,
+            registration_expiry=registration_expiry,
+            dot_number=data.get('dot_number'),
+            purchase_date=purchase_date,
+            purchase_price=safe_float(data.get('purchase_price')),
+            current_value=safe_float(data.get('current_value')),
+            notes=data.get('notes')
+        )
+        
+        db.session.add(truck)
+        db.session.commit()
+        
+        return jsonify(truck.to_dict()), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trucks/<int:truck_id>', methods=['DELETE'])
+def delete_truck_api(truck_id):
+    try:
+        truck = Truck.query.get_or_404(truck_id)
+        
+        # Check if truck has associated tickets
+        tickets = Ticket.query.filter_by(truck_number=truck.truck_number).all()
+        if tickets:
+            return jsonify({'error': 'Cannot delete truck with associated tickets. Reassign tickets first.'}), 400
+        
+        db.session.delete(truck)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Truck deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Location Management APIs
+@app.route('/api/locations', methods=['GET'])
+def get_locations():
+    locations = Location.query.filter_by(is_active=True).all()
+    return jsonify([{
+        'id': loc.id,
+        'name': loc.name,
+        'location_type': loc.location_type,
+        'street_address': loc.street_address,
+        'city': loc.city,
+        'state': loc.state,
+        'zip_code': loc.zip_code,
+        'gps_coordinates': loc.gps_coordinates,
+        'contact_person': loc.contact_person,
+        'phone_number': loc.phone_number
+    } for loc in locations])
+
+@app.route('/api/locations', methods=['POST'])
+def create_location_api():
+    try:
+        data = request.get_json()
+        
+        def safe_bool(value):
+            return value in [True, 'true', 'True', '1', 1]
+        
+        location = Location(
+            name=data.get('name'),
+            location_type=data.get('location_type', 'office'),
+            street_address=data.get('street_address'),
+            city=data.get('city'),
+            state=data.get('state'),
+            zip_code=data.get('zip_code'),
+            county=data.get('county'),
+            gps_coordinates=data.get('gps_coordinates'),
+            access_notes=data.get('access_notes'),
+            capacity_notes=data.get('capacity_notes'),
+            security_info=data.get('security_info'),
+            contact_person=data.get('contact_person'),
+            phone_number=data.get('phone_number'),
+            is_active=safe_bool(data.get('is_active', True)),
+            hours_of_operation=data.get('hours_of_operation')
+        )
+        
+        db.session.add(location)
+        db.session.commit()
+        
+        return jsonify({
+            'id': location.id,
+            'name': location.name,
+            'location_type': location.location_type,
+            'street_address': location.street_address,
+            'city': location.city,
+            'state': location.state,
+            'zip_code': location.zip_code
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Team Management APIs
+@app.route('/api/team-members', methods=['GET'])
+def get_team_members():
+    members = TeamMember.query.all()
+    return jsonify([member.to_dict() for member in members])
+
+@app.route('/api/team-members', methods=['POST'])
+def create_team_member_api():
+    try:
+        data = request.get_json()
+        
+        def safe_bool(value):
+            return value in [True, 'true', 'True', '1', 1]
+        
+        # Parse dates
+        hire_date = None
+        if data.get('hire_date'):
+            try:
+                from datetime import datetime
+                hire_date = datetime.fromisoformat(data.get('hire_date')).date()
+            except ValueError:
+                pass
+        
+        cdl_expiry = None
+        if data.get('cdl_expiry'):
+            try:
+                from datetime import datetime
+                cdl_expiry = datetime.fromisoformat(data.get('cdl_expiry')).date()
+            except ValueError:
+                pass
+                
+        septic_cert_expiry = None
+        if data.get('septic_cert_expiry'):
+            try:
+                from datetime import datetime
+                septic_cert_expiry = datetime.fromisoformat(data.get('septic_cert_expiry')).date()
+            except ValueError:
+                pass
+        
+        # Parse time
+        shift_start_time = None
+        if data.get('shift_start_time'):
+            try:
+                from datetime import datetime
+                shift_start_time = datetime.strptime(data.get('shift_start_time'), '%H:%M').time()
+            except ValueError:
+                pass
+                
+        shift_end_time = None
+        if data.get('shift_end_time'):
+            try:
+                from datetime import datetime
+                shift_end_time = datetime.strptime(data.get('shift_end_time'), '%H:%M').time()
+            except ValueError:
+                pass
+        
+        team_member = TeamMember(
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name'),
+            employee_id=data.get('employee_id'),
+            phone_primary=data.get('phone_primary'),
+            phone_secondary=data.get('phone_secondary'),
+            email=data.get('email'),
+            home_street_address=data.get('home_street_address'),
+            home_city=data.get('home_city'),
+            home_state=data.get('home_state'),
+            home_zip_code=data.get('home_zip_code'),
+            emergency_contact_name=data.get('emergency_contact_name'),
+            emergency_contact_phone=data.get('emergency_contact_phone'),
+            emergency_contact_relationship=data.get('emergency_contact_relationship'),
+            position=data.get('position'),
+            department=data.get('department', 'field_service'),
+            hire_date=hire_date,
+            employment_status=data.get('employment_status', 'active'),
+            cdl_license=safe_bool(data.get('cdl_license')),
+            cdl_expiry=cdl_expiry,
+            septic_certification=safe_bool(data.get('septic_certification')),
+            septic_cert_expiry=septic_cert_expiry,
+            other_certifications=data.get('other_certifications'),
+            shift_start_time=shift_start_time,
+            shift_end_time=shift_end_time,
+            work_days=data.get('work_days', 'weekdays'),
+            notes=data.get('notes'),
+            is_supervisor=safe_bool(data.get('is_supervisor')),
+            can_operate_trucks=safe_bool(data.get('can_operate_trucks', True))
+        )
+        
+        db.session.add(team_member)
+        db.session.commit()
+        
+        return jsonify(team_member.to_dict()), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/team-members/<int:member_id>', methods=['DELETE'])
+def delete_team_member_api(member_id):
+    try:
+        team_member = TeamMember.query.get_or_404(member_id)
+        
+        db.session.delete(team_member)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Team member deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/health')
 def health():
     return {'status': 'healthy', 'service': 'TrueTank'}
@@ -717,6 +1064,273 @@ with app.app_context():
     db.create_all()
     
     # Add sample data if database is empty
+    # First create locations, trucks, and team members, then customers and tickets
+    if Location.query.count() == 0:
+        # Create sample locations first
+        locations = [
+            Location(
+                name='Main Office',
+                location_type='office',
+                street_address='123 Business Blvd',
+                city='Anytown',
+                state='TX',
+                zip_code='12345',
+                county='Sample County',
+                contact_person='Office Manager',
+                phone_number='(555) 123-4567',
+                hours_of_operation='8:00 AM - 5:00 PM',
+                access_notes='Main entrance, visitor parking available'
+            ),
+            Location(
+                name='Storage Facility A',
+                location_type='storage',
+                street_address='456 Storage Lane',
+                city='Anytown',
+                state='TX',
+                zip_code='12346',
+                county='Sample County',
+                contact_person='Yard Supervisor',
+                phone_number='(555) 234-5678',
+                hours_of_operation='24/7 Access',
+                capacity_notes='Can store up to 8 trucks',
+                security_info='Gate code: 1234, Security cameras active',
+                access_notes='Large vehicles use rear entrance'
+            ),
+            Location(
+                name='North Depot',
+                location_type='depot',
+                street_address='789 Industrial Dr',
+                city='Somewhere',
+                state='TX',
+                zip_code='67890',
+                county='Sample County',
+                contact_person='Site Manager',
+                phone_number='(555) 345-6789',
+                hours_of_operation='6:00 AM - 10:00 PM',
+                capacity_notes='Can store up to 4 trucks',
+                access_notes='Fuel station available on site'
+            )
+        ]
+        
+        for location in locations:
+            db.session.add(location)
+        
+        db.session.flush()  # Flush to get location IDs
+        
+        # Add sample trucks
+        trucks = [
+            Truck(
+                truck_number='T-001',
+                license_plate='ST001TX',
+                make='International',
+                model='DuraStar',
+                year=2020,
+                color='White',
+                tank_capacity=2500,
+                tank_material='aluminum',
+                num_compartments=2,
+                pump_type='Masport HXL4V',
+                pump_cfm=400,
+                hose_length=200,
+                hose_diameter=4.0,
+                has_hose_reel=True,
+                has_pressure_washer=True,
+                has_gps_tracking=True,
+                status='active',
+                current_location_id=locations[1].id,  # Storage Facility A
+                current_mileage=45000,
+                engine_hours=1200.5,
+                maintenance_interval_miles=5000,
+                maintenance_interval_hours=250,
+                insurance_company='Fleet Insurance Co',
+                purchase_price=125000.00,
+                current_value=95000.00,
+                notes='Primary pumping truck, excellent condition'
+            ),
+            Truck(
+                truck_number='T-002',
+                license_plate='ST002TX',
+                make='Freightliner',
+                model='Business Class M2',
+                year=2019,
+                color='Blue',
+                tank_capacity=4000,
+                tank_material='aluminum',
+                num_compartments=3,
+                pump_type='Fruitland 8200',
+                pump_cfm=500,
+                hose_length=300,
+                hose_diameter=4.0,
+                has_hose_reel=True,
+                has_pressure_washer=False,
+                has_camera_system=True,
+                has_gps_tracking=True,
+                status='active',
+                current_location_id=locations[2].id,  # North Depot
+                current_mileage=52000,
+                engine_hours=1450.0,
+                special_equipment='Root cutting attachment, industrial pump',
+                notes='Heavy-duty truck for commercial jobs'
+            ),
+            Truck(
+                truck_number='T-003',
+                license_plate='ST003TX',
+                make='Peterbilt',
+                model='220',
+                year=2018,
+                color='Red',
+                tank_capacity=1500,
+                tank_material='fiberglass',
+                num_compartments=1,
+                pump_type='Jurop LC420',
+                pump_cfm=350,
+                hose_length=150,
+                hose_diameter=3.0,
+                has_hose_reel=False,
+                has_pressure_washer=True,
+                has_gps_tracking=False,
+                status='maintenance',
+                current_location_id=locations[0].id,  # Main Office
+                current_mileage=78000,
+                engine_hours=2100.0,
+                notes='Compact truck for residential areas, currently in for maintenance'
+            )
+        ]
+        
+        for truck in trucks:
+            db.session.add(truck)
+        
+        # Add sample team members
+        team_members = [
+            TeamMember(
+                first_name='Mike',
+                last_name='Johnson',
+                employee_id='EMP001',
+                phone_primary='(555) 111-2222',
+                email='mike.johnson@truetank.com',
+                home_street_address='123 Maple St',
+                home_city='Anytown',
+                home_state='TX',
+                home_zip_code='12345',
+                emergency_contact_name='Sarah Johnson',
+                emergency_contact_phone='(555) 111-3333',
+                emergency_contact_relationship='Spouse',
+                position='Senior Technician',
+                hire_date=datetime(2019, 3, 15).date(),
+                employment_status='active',
+                cdl_license=True,
+                septic_certification=True,
+                is_supervisor=True,
+                can_operate_trucks=True,
+                shift_start_time=datetime.strptime('07:00', '%H:%M').time(),
+                shift_end_time=datetime.strptime('16:00', '%H:%M').time(),
+                work_days='weekdays',
+                notes='Lead technician, certified trainer'
+            ),
+            TeamMember(
+                first_name='Sarah',
+                last_name='Davis',
+                employee_id='EMP002',
+                phone_primary='(555) 222-3333',
+                email='sarah.davis@truetank.com',
+                home_street_address='456 Oak Ave',
+                home_city='Somewhere',
+                home_state='TX',
+                home_zip_code='67890',
+                emergency_contact_name='Tom Davis',
+                emergency_contact_phone='(555) 222-4444',
+                emergency_contact_relationship='Spouse',
+                position='Technician',
+                hire_date=datetime(2020, 8, 1).date(),
+                employment_status='active',
+                cdl_license=True,
+                septic_certification=True,
+                can_operate_trucks=True,
+                shift_start_time=datetime.strptime('08:00', '%H:%M').time(),
+                shift_end_time=datetime.strptime('17:00', '%H:%M').time(),
+                work_days='weekdays',
+                notes='Inspection specialist'
+            ),
+            TeamMember(
+                first_name='Tom',
+                last_name='Wilson',
+                employee_id='EMP003',
+                phone_primary='(555) 333-4444',
+                email='tom.wilson@truetank.com',
+                home_street_address='789 Pine Rd',
+                home_city='Elsewhere',
+                home_state='TX',
+                home_zip_code='54321',
+                emergency_contact_name='Lisa Wilson',
+                emergency_contact_phone='(555) 333-5555',
+                emergency_contact_relationship='Sister',
+                position='Driver/Helper',
+                hire_date=datetime(2021, 5, 10).date(),
+                employment_status='active',
+                cdl_license=True,
+                septic_certification=False,
+                can_operate_trucks=True,
+                shift_start_time=datetime.strptime('06:00', '%H:%M').time(),
+                shift_end_time=datetime.strptime('15:00', '%H:%M').time(),
+                work_days='all',
+                notes='Weekend coverage, working on certification'
+            ),
+            TeamMember(
+                first_name='Carlos',
+                last_name='Rodriguez',
+                employee_id='EMP004',
+                phone_primary='(555) 444-5555',
+                email='carlos.rodriguez@truetank.com',
+                home_street_address='321 Cedar Ln',
+                home_city='Anytown',
+                home_state='TX',
+                home_zip_code='12347',
+                emergency_contact_name='Maria Rodriguez',
+                emergency_contact_phone='(555) 444-6666',
+                emergency_contact_relationship='Wife',
+                position='Technician',
+                hire_date=datetime(2021, 9, 20).date(),
+                employment_status='active',
+                cdl_license=True,
+                septic_certification=True,
+                can_operate_trucks=True,
+                shift_start_time=datetime.strptime('07:30', '%H:%M').time(),
+                shift_end_time=datetime.strptime('16:30', '%H:%M').time(),
+                work_days='weekdays',
+                notes='Bilingual, handles Spanish-speaking customers'
+            ),
+            TeamMember(
+                first_name='Jennifer',
+                last_name='Brown',
+                employee_id='EMP005',
+                phone_primary='(555) 555-6666',
+                email='jennifer.brown@truetank.com',
+                home_street_address='654 Elm St',
+                home_city='Somewhere',
+                home_state='TX',
+                home_zip_code='67891',
+                emergency_contact_name='David Brown',
+                emergency_contact_phone='(555) 555-7777',
+                emergency_contact_relationship='Husband',
+                position='Office Manager',
+                hire_date=datetime(2018, 11, 5).date(),
+                employment_status='active',
+                cdl_license=False,
+                septic_certification=False,
+                can_operate_trucks=False,
+                shift_start_time=datetime.strptime('08:00', '%H:%M').time(),
+                shift_end_time=datetime.strptime('17:00', '%H:%M').time(),
+                work_days='weekdays',
+                notes='Handles scheduling and customer service'
+            )
+        ]
+        
+        for member in team_members:
+            db.session.add(member)
+        
+        db.session.commit()
+    
+    # Now create customers and tickets
     if Customer.query.count() == 0:
         # Create sample customers
         customers = [

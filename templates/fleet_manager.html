@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}Fleet Manager - TrueTank{% endblock %}
+
+{% block content %}
+<div class="fleet-container">
+    <div class="fleet-header">
+        <h2>Fleet Manager</h2>
+        <div class="header-actions">
+            <a href="{{ url_for('create_truck') }}" class="btn btn-primary">+ Add Truck</a>
+            <a href="{{ url_for('create_location') }}" class="btn btn-secondary">+ Add Location</a>
+        </div>
+    </div>
+    
+    <div class="fleet-stats">
+        <div class="stat-card">
+            <h4>Total Trucks</h4>
+            <div class="stat-number">{{ trucks|length }}</div>
+        </div>
+        <div class="stat-card">
+            <h4>Active</h4>
+            <div class="stat-number">{{ trucks|selectattr('status', 'equalto', 'active')|list|length }}</div>
+        </div>
+        <div class="stat-card">
+            <h4>In Maintenance</h4>
+            <div class="stat-number">{{ trucks|selectattr('status', 'equalto', 'maintenance')|list|length }}</div>
+        </div>
+        <div class="stat-card">
+            <h4>Storage Locations</h4>
+            <div class="stat-number">{{ locations|length }}</div>
+        </div>
+    </div>
+    
+    <div class="fleet-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Truck #</th>
+                    <th>Vehicle Details</th>
+                    <th>Tank Specs</th>
+                    <th>Status</th>
+                    <th>Current Location</th>
+                    <th>Mileage/Hours</th>
+                    <th>Maintenance</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for truck in trucks %}
+                <tr>
+                    <td>
+                        <strong>{{ truck.truck_number }}</strong>
+                        <br><small>{{ truck.license_plate or 'No plate' }}</small>
+                    </td>
+                    <td>
+                        <strong>{{ truck.make }} {{ truck.model }}</strong>
+                        {% if truck.year %}<br><small>{{ truck.year }} - {{ truck.color or 'Unknown' }}</small>{% endif %}
+                    </td>
+                    <td>
+                        <strong>{{ truck.tank_capacity or 'N/A' }} gal</strong>
+                        <br><small>{{ truck.tank_material|title or 'Unknown' }} - {{ truck.num_compartments or 1 }} compartment(s)</small>
+                        {% if truck.pump_type %}<br><small>{{ truck.pump_type }}</small>{% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ truck.status }}">
+                            {{ truck.status|replace('_', ' ')|title }}
+                        </span>
+                        {% if truck.has_gps_tracking %}
+                            <br><small class="feature-badge">📍 GPS</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if truck.storage_location %}
+                            <strong>{{ truck.storage_location.name }}</strong>
+                            <br><small>{{ truck.storage_location.location_type|title }}</small>
+                        {% else %}
+                            <em>No location assigned</em>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if truck.current_mileage %}
+                            <strong>{{ "{:,}".format(truck.current_mileage) }} miles</strong>
+                        {% else %}
+                            <strong>N/A miles</strong>
+                        {% endif %}
+                        {% if truck.engine_hours %}
+                            <br><small>{{ truck.engine_hours }} hrs</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if truck.last_maintenance %}
+                            <small>Last: {{ truck.last_maintenance.strftime('%m/%d/%Y') }}</small>
+                        {% else %}
+                            <small>Last: Not recorded</small>
+                        {% endif %}
+                        {% if truck.next_maintenance_due %}
+                            <br><small>Due: {{ truck.next_maintenance_due.strftime('%m/%d/%Y') }}</small>
+                            {% set days_until = (truck.next_maintenance_due - truck.last_maintenance).days if truck.last_maintenance else None %}
+                            {% if days_until and days_until < 30 %}
+                                <span class="maintenance-warning">⚠️</span>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="{{ url_for('edit_truck', truck_id=truck.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTruck({{ truck.id }}, '{{ truck.truck_number }}')">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if locations %}
+    <div class="locations-section">
+        <h3>Storage Locations</h3>
+        <div class="locations-grid">
+            {% for location in locations %}
+            <div class="location-card">
+                <div class="location-header">
+                    <h4>{{ location.name }}</h4>
+                    <span class="location-type">{{ location.location_type|title }}</span>
+                </div>
+                <div class="location-details">
+                    <p><strong>Address:</strong> {{ location.street_address }}, {{ location.city }}, {{ location.state }}</p>
+                    {% if location.contact_person %}<p><strong>Contact:</strong> {{ location.contact_person }}</p>{% endif %}
+                    {% if location.phone_number %}<p><strong>Phone:</strong> {{ location.phone_number }}</p>{% endif %}
+                    {% if location.capacity_notes %}<p><strong>Capacity:</strong> {{ location.capacity_notes }}</p>{% endif %}
+                </div>
+                <div class="location-trucks">
+                    {% set location_trucks = trucks|selectattr('current_location_id', 'equalto', location.id)|list %}
+                    <small><strong>Trucks:</strong> 
+                    {% if location_trucks %}
+                        {% for truck in location_trucks %}{{ truck.truck_number }}{% if not loop.last %}, {% endif %}{% endfor %}
+                    {% else %}
+                        None
+                    {% endif %}
+                    </small>
+                </div>
+                <div class="location-actions">
+                    <a href="{{ url_for('edit_location', location_id=location.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.fleet-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.fleet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.fleet-header h2 {
+    color: #2c3e50;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.fleet-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #666;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.fleet-table {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.fleet-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.fleet-table th,
+.fleet-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.fleet-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background-color: #27ae60;
+    color: white;
+}
+
+.status-maintenance {
+    background-color: #f39c12;
+    color: white;
+}
+
+.status-out-of-service {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.feature-badge {
+    color: #3498db;
+    font-size: 0.7rem;
+}
+
+.maintenance-warning {
+    color: #f39c12;
+    font-size: 0.8rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #c0392b;
+}
+
+.locations-section {
+    margin-top: 3rem;
+}
+
+.locations-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.locations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.location-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+}
+
+.location-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.location-header h4 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.location-type {
+    background-color: #3498db;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.location-details p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.location-trucks {
+    margin: 1rem 0;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.location-actions {
+    text-align: right;
+}
+
+@media (max-width: 768px) {
+    .fleet-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .fleet-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .fleet-table {
+        overflow-x: auto;
+    }
+    
+    .locations-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function deleteTruck(truckId, truckNumber) {
+    if (confirm(`Are you sure you want to delete truck "${truckNumber}"? This action cannot be undone.`)) {
+        fetch(`/api/trucks/${truckId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('Truck deleted successfully!');
+                window.location.reload();
+            } else {
+                alert('Error deleting truck: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete truck. Please try again.');
+        });
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit Truck' if truck else 'Add Truck' }} - TrueTank{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-header">
+        <h2>{{ 'Edit Truck' if truck else 'Add Truck' }}</h2>
+        <div class="form-actions">
+            <a href="{{ url_for('fleet_manager') }}" class="btn btn-secondary">← Back to Fleet</a>
+        </div>
+    </div>
+
+    <form id="truck-form" class="ticket-form">
+        {% if truck %}
+            <input type="hidden" id="truck-id" value="{{ truck.id }}">
+        {% endif %}
+        
+        <div class="form-grid">
+            <!-- Vehicle Identification -->
+            <div class="form-section">
+                <h3>Vehicle Identification</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="truck_number">Truck Number *</label>
+                        <input type="text" id="truck_number" name="truck_number" value="{{ truck.truck_number if truck else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="license_plate">License Plate</label>
+                        <input type="text" id="license_plate" name="license_plate" value="{{ truck.license_plate if truck else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="vin">VIN</label>
+                        <input type="text" id="vin" name="vin" value="{{ truck.vin if truck else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vehicle Details -->
+            <div class="form-section">
+                <h3>Vehicle Details</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="make">Make</label>
+                        <input type="text" id="make" name="make" value="{{ truck.make if truck else '' }}" placeholder="Ford, Freightliner, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label for="model">Model</label>
+                        <input type="text" id="model" name="model" value="{{ truck.model if truck else '' }}" placeholder="F-450, M2, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label for="year">Year</label>
+                        <input type="number" id="year" name="year" value="{{ truck.year if truck else '' }}" min="1980" max="2030">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="color">Color</label>
+                    <input type="text" id="color" name="color" value="{{ truck.color if truck else '' }}" placeholder="White, Blue, etc.">
+                </div>
+            </div>
+
+            <!-- Tank Specifications -->
+            <div class="form-section">
+                <h3>Tank Specifications</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tank_capacity">Tank Capacity (gallons) *</label>
+                        <input type="number" id="tank_capacity" name="tank_capacity" value="{{ truck.tank_capacity if truck else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tank_material">Tank Material</label>
+                        <select id="tank_material" name="tank_material">
+                            <option value="aluminum" {{ 'selected' if truck and truck.tank_material == 'aluminum' else '' }}>Aluminum</option>
+                            <option value="steel" {{ 'selected' if truck and truck.tank_material == 'steel' else '' }}>Steel</option>
+                            <option value="fiberglass" {{ 'selected' if truck and truck.tank_material == 'fiberglass' else '' }}>Fiberglass</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="num_compartments">Number of Compartments</label>
+                        <input type="number" id="num_compartments" name="num_compartments" value="{{ truck.num_compartments if truck else '1' }}" min="1" max="5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Equipment Details -->
+            <div class="form-section">
+                <h3>Equipment Details</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pump_type">Pump Type</label>
+                        <select id="pump_type" name="pump_type">
+                            <option value="">Select pump type...</option>
+                            <option value="Masport" {{ 'selected' if truck and truck.pump_type == 'Masport' else '' }}>Masport</option>
+                            <option value="Fruitland" {{ 'selected' if truck and truck.pump_type == 'Fruitland' else '' }}>Fruitland</option>
+                            <option value="Jurop" {{ 'selected' if truck and truck.pump_type == 'Jurop' else '' }}>Jurop</option>
+                            <option value="NVE" {{ 'selected' if truck and truck.pump_type == 'NVE' else '' }}>NVE</option>
+                            <option value="Other" {{ 'selected' if truck and truck.pump_type == 'Other' else '' }}>Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pump_cfm">Pump CFM</label>
+                        <input type="number" id="pump_cfm" name="pump_cfm" value="{{ truck.pump_cfm if truck else '' }}" placeholder="Cubic feet per minute">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="hose_length">Hose Length (feet)</label>
+                        <input type="number" id="hose_length" name="hose_length" value="{{ truck.hose_length if truck else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="hose_diameter">Hose Diameter (inches)</label>
+                        <input type="number" id="hose_diameter" name="hose_diameter" step="0.25" value="{{ truck.hose_diameter if truck else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="checkbox" id="has_hose_reel" name="has_hose_reel" {{ 'checked' if truck and truck.has_hose_reel else '' }}>
+                        <label for="has_hose_reel">Has Hose Reel</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Equipment -->
+            <div class="form-section">
+                <h3>Additional Equipment</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="checkbox" id="has_pressure_washer" name="has_pressure_washer" {{ 'checked' if truck and truck.has_pressure_washer else '' }}>
+                        <label for="has_pressure_washer">Pressure Washer</label>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="has_camera_system" name="has_camera_system" {{ 'checked' if truck and truck.has_camera_system else '' }}>
+                        <label for="has_camera_system">Camera System</label>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="has_gps_tracking" name="has_gps_tracking" {{ 'checked' if truck and truck.has_gps_tracking else '' }}>
+                        <label for="has_gps_tracking">GPS Tracking</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="special_equipment">Special Equipment</label>
+                    <textarea id="special_equipment" name="special_equipment" rows="3" placeholder="List any additional equipment or modifications...">{{ truck.special_equipment if truck else '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Operational Status -->
+            <div class="form-section">
+                <h3>Operational Status</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select id="status" name="status">
+                            <option value="active" {{ 'selected' if truck and truck.status == 'active' else '' }}>Active</option>
+                            <option value="maintenance" {{ 'selected' if truck and truck.status == 'maintenance' else '' }}>Maintenance</option>
+                            <option value="out_of_service" {{ 'selected' if truck and truck.status == 'out_of_service' else '' }}>Out of Service</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="current_location_id">Storage Location</label>
+                        <select id="current_location_id" name="current_location_id">
+                            <option value="">No location assigned</option>
+                            {% for location in locations %}
+                            <option value="{{ location.id }}" {{ 'selected' if truck and truck.current_location_id == location.id else '' }}>
+                                {{ location.name }} ({{ location.location_type|title }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Maintenance Tracking -->
+            <div class="form-section">
+                <h3>Maintenance Tracking</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="current_mileage">Current Mileage</label>
+                        <input type="number" id="current_mileage" name="current_mileage" value="{{ truck.current_mileage if truck else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="engine_hours">Engine Hours</label>
+                        <input type="number" id="engine_hours" name="engine_hours" step="0.1" value="{{ truck.engine_hours if truck else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="last_maintenance">Last Maintenance</label>
+                        <input type="date" id="last_maintenance" name="last_maintenance" value="{{ truck.last_maintenance.isoformat() if truck and truck.last_maintenance else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="next_maintenance_due">Next Maintenance Due</label>
+                        <input type="date" id="next_maintenance_due" name="next_maintenance_due" value="{{ truck.next_maintenance_due.isoformat() if truck and truck.next_maintenance_due else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="maintenance_interval_miles">Maintenance Interval (miles)</label>
+                        <input type="number" id="maintenance_interval_miles" name="maintenance_interval_miles" value="{{ truck.maintenance_interval_miles if truck else '5000' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="maintenance_interval_hours">Maintenance Interval (hours)</label>
+                        <input type="number" id="maintenance_interval_hours" name="maintenance_interval_hours" value="{{ truck.maintenance_interval_hours if truck else '250' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insurance & Registration -->
+            <div class="form-section">
+                <h3>Insurance & Registration</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="insurance_company">Insurance Company</label>
+                        <input type="text" id="insurance_company" name="insurance_company" value="{{ truck.insurance_company if truck else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="insurance_policy">Policy Number</label>
+                        <input type="text" id="insurance_policy" name="insurance_policy" value="{{ truck.insurance_policy if truck else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="insurance_expiry">Insurance Expiry</label>
+                        <input type="date" id="insurance_expiry" name="insurance_expiry" value="{{ truck.insurance_expiry.isoformat() if truck and truck.insurance_expiry else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="registration_expiry">Registration Expiry</label>
+                        <input type="date" id="registration_expiry" name="registration_expiry" value="{{ truck.registration_expiry.isoformat() if truck and truck.registration_expiry else '' }}">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="dot_number">DOT Number</label>
+                    <input type="text" id="dot_number" name="dot_number" value="{{ truck.dot_number if truck else '' }}">
+                </div>
+            </div>
+
+            <!-- Financial Information -->
+            <div class="form-section">
+                <h3>Financial Information</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="purchase_date">Purchase Date</label>
+                        <input type="date" id="purchase_date" name="purchase_date" value="{{ truck.purchase_date.isoformat() if truck and truck.purchase_date else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase_price">Purchase Price</label>
+                        <input type="number" id="purchase_price" name="purchase_price" step="0.01" value="{{ truck.purchase_price if truck else '' }}" placeholder="$">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="current_value">Current Value</label>
+                    <input type="number" id="current_value" name="current_value" step="0.01" value="{{ truck.current_value if truck else '' }}" placeholder="$">
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-section">
+                <h3>Notes</h3>
+                
+                <div class="form-group">
+                    <label for="notes">Additional Notes</label>
+                    <textarea id="notes" name="notes" rows="4" placeholder="Any additional notes about this truck...">{{ truck.notes if truck else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Update Truck' if truck else 'Create Truck' }}</button>
+            <a href="{{ url_for('fleet_manager') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('truck-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+        
+        const truckId = document.getElementById('truck-id');
+        const isEdit = truckId && truckId.value;
+        
+        const url = isEdit ? `/api/trucks/${truckId.value}` : '/api/trucks';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                alert('Error: ' + result.error);
+            } else {
+                alert(`Truck ${isEdit ? 'updated' : 'created'} successfully!`);
+                window.location.href = '/fleet';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(`Failed to ${isEdit ? 'update' : 'create'} truck. Please try again.`);
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -52,15 +52,36 @@
                     </td>
                     <td>
                         {% if customer.septic_systems %}
-                            {{ customer.septic_systems|length }} system(s)
-                            <br><small>
-                                {% for system in customer.septic_systems[:2] %}
-                                    {{ system.system_type }}{{ ', ' if not loop.last else '' }}
+                            <div class="systems-summary">
+                                <button class="btn btn-sm btn-link toggle-systems" onclick="toggleSystems({{ customer.id }})">
+                                    <span id="toggle-icon-{{ customer.id }}">▶</span> {{ customer.septic_systems|length }} system(s)
+                                </button>
+                            </div>
+                            <div id="systems-{{ customer.id }}" class="systems-detail" style="display: none;">
+                                {% for system in customer.septic_systems %}
+                                <div class="system-card">
+                                    <div class="system-info">
+                                        <strong>{{ system.system_type|title }}</strong> - {{ system.tank_size }} gal ({{ system.tank_material|title }})
+                                        {% if system.num_compartments and system.num_compartments > 1 %}
+                                            <br><small>{{ system.num_compartments }} compartments</small>
+                                        {% endif %}
+                                        {% if system.last_pumped %}
+                                            <br><small>Last pumped: {{ system.last_pumped.strftime('%m/%d/%Y') }}</small>
+                                        {% endif %}
+                                        {% if system.next_pump_due %}
+                                            <br><small>Next due: {{ system.next_pump_due.strftime('%m/%d/%Y') }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="system-actions">
+                                        <a href="{{ url_for('edit_septic_system', system_id=system.id) }}" class="btn btn-xs btn-primary">Edit</a>
+                                        <button class="btn btn-xs btn-danger" onclick="deleteSystem({{ system.id }}, '{{ system.system_type }}')">Delete</button>
+                                    </div>
+                                </div>
                                 {% endfor %}
-                                {% if customer.septic_systems|length > 2 %}...{% endif %}
-                            </small>
+                            </div>
                         {% else %}
                             <em>No systems</em>
+                            <br><a href="{{ url_for('create_septic_system') }}?customer_id={{ customer.id }}" class="btn btn-xs btn-secondary">+ Add System</a>
                         {% endif %}
                     </td>
                     <td>
@@ -170,6 +191,64 @@
 .btn-danger:hover {
     background-color: #c0392b;
 }
+
+.btn-link {
+    background: none;
+    border: none;
+    color: #3498db;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0.25rem 0.5rem;
+}
+
+.btn-link:hover {
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+.btn-xs {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.7rem;
+    margin-right: 0.25rem;
+}
+
+.systems-detail {
+    margin-top: 0.5rem;
+    border-left: 3px solid #3498db;
+    padding-left: 0.5rem;
+}
+
+.system-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.system-info {
+    flex: 1;
+}
+
+.system-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.toggle-systems {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+[id^="toggle-icon-"] {
+    font-size: 0.8rem;
+    transition: transform 0.2s ease;
+}
 </style>
 
 <script>
@@ -193,6 +272,43 @@ function deleteCustomer(customerId, customerName) {
         .catch(error => {
             console.error('Error:', error);
             alert('Failed to delete customer. Please try again.');
+        });
+    }
+}
+
+function toggleSystems(customerId) {
+    const systemsDetail = document.getElementById(`systems-${customerId}`);
+    const toggleIcon = document.getElementById(`toggle-icon-${customerId}`);
+    
+    if (systemsDetail.style.display === 'none') {
+        systemsDetail.style.display = 'block';
+        toggleIcon.textContent = '▼';
+    } else {
+        systemsDetail.style.display = 'none';
+        toggleIcon.textContent = '▶';
+    }
+}
+
+function deleteSystem(systemId, systemType) {
+    if (confirm(`Are you sure you want to delete the ${systemType} septic system? This action cannot be undone.`)) {
+        fetch(`/api/septic-systems/${systemId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('Septic system deleted successfully!');
+                window.location.reload();
+            } else {
+                alert('Error deleting septic system: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete septic system. Please try again.');
         });
     }
 }

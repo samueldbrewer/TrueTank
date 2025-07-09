@@ -130,6 +130,7 @@ class Ticket(db.Model):
     
     # Scheduling
     scheduled_date = db.Column(db.DateTime, nullable=True)
+    requested_service_date = db.Column(db.Date, nullable=True)  # When customer wants service by
     estimated_duration = db.Column(db.Integer, nullable=True)  # minutes
     route_position = db.Column(db.Integer, nullable=True)
     column_position = db.Column(db.Integer, nullable=True, default=0)  # Position within kanban column
@@ -196,6 +197,7 @@ class Ticket(db.Model):
     # Equipment Used
     equipment_used = db.Column(db.Text, nullable=True)
     truck_number = db.Column(db.String(20), nullable=True)
+    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=True)
     
     # GPS and Photos
     gps_location = db.Column(db.String(100), nullable=True)
@@ -220,6 +222,7 @@ class Ticket(db.Model):
             'priority': self.priority,
             'status': self.status,
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
+            'requested_service_date': self.requested_service_date.isoformat() if self.requested_service_date else None,
             'estimated_duration': self.estimated_duration,
             'column_position': self.column_position,
             'assigned_technician': self.assigned_technician,
@@ -298,3 +301,200 @@ class ServiceHistory(db.Model):
     ticket = db.relationship('Ticket', backref='service_history_entry')
     customer = db.relationship('Customer', backref='service_history')
     septic_system = db.relationship('SepticSystem', backref='service_history')
+
+class Location(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Location Details
+    name = db.Column(db.String(100), nullable=False)  # "Main Office", "Storage Facility A", etc.
+    location_type = db.Column(db.String(50), nullable=False, default='office')  # office, storage, depot
+    
+    # Address Information
+    street_address = db.Column(db.String(200), nullable=False)
+    city = db.Column(db.String(100), nullable=False)
+    state = db.Column(db.String(50), nullable=False)
+    zip_code = db.Column(db.String(20), nullable=False)
+    county = db.Column(db.String(100), nullable=True)
+    
+    # Location Specifications
+    gps_coordinates = db.Column(db.String(50), nullable=True)
+    access_notes = db.Column(db.Text, nullable=True)
+    capacity_notes = db.Column(db.Text, nullable=True)  # How many trucks can be stored
+    security_info = db.Column(db.Text, nullable=True)  # Gate codes, security details
+    
+    # Contact Information
+    contact_person = db.Column(db.String(100), nullable=True)
+    phone_number = db.Column(db.String(20), nullable=True)
+    
+    # Operational Details
+    is_active = db.Column(db.Boolean, default=True)
+    hours_of_operation = db.Column(db.String(200), nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    trucks = db.relationship('Truck', backref='storage_location', lazy=True)
+    
+    def __repr__(self):
+        return f'<Location {self.name}>'
+
+class Truck(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Vehicle Identification
+    truck_number = db.Column(db.String(20), unique=True, nullable=False)
+    license_plate = db.Column(db.String(20), nullable=True)
+    vin = db.Column(db.String(50), nullable=True)
+    
+    # Vehicle Details
+    make = db.Column(db.String(50), nullable=True)
+    model = db.Column(db.String(50), nullable=True)
+    year = db.Column(db.Integer, nullable=True)
+    color = db.Column(db.String(30), nullable=True)
+    
+    # Tank Specifications
+    tank_capacity = db.Column(db.Integer, nullable=True)  # gallons
+    tank_material = db.Column(db.String(50), nullable=True, default='aluminum')  # aluminum, steel, fiberglass
+    num_compartments = db.Column(db.Integer, nullable=True, default=1)
+    
+    # Equipment Details
+    pump_type = db.Column(db.String(100), nullable=True)  # Masport, Fruitland, Jurop, NVE
+    pump_cfm = db.Column(db.Integer, nullable=True)  # cubic feet per minute
+    hose_length = db.Column(db.Integer, nullable=True)  # feet
+    hose_diameter = db.Column(db.Float, nullable=True)  # inches
+    has_hose_reel = db.Column(db.Boolean, default=False)
+    
+    # Additional Equipment
+    has_pressure_washer = db.Column(db.Boolean, default=False)
+    has_camera_system = db.Column(db.Boolean, default=False)
+    has_gps_tracking = db.Column(db.Boolean, default=False)
+    special_equipment = db.Column(db.Text, nullable=True)  # Additional equipment notes
+    
+    # Operational Status
+    status = db.Column(db.String(20), nullable=False, default='active')  # active, maintenance, out_of_service
+    current_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)
+    
+    # Maintenance Tracking
+    current_mileage = db.Column(db.Integer, nullable=True)
+    engine_hours = db.Column(db.Float, nullable=True)
+    last_maintenance = db.Column(db.Date, nullable=True)
+    next_maintenance_due = db.Column(db.Date, nullable=True)
+    maintenance_interval_miles = db.Column(db.Integer, nullable=True, default=5000)
+    maintenance_interval_hours = db.Column(db.Integer, nullable=True, default=250)
+    
+    # Insurance & Registration
+    insurance_company = db.Column(db.String(100), nullable=True)
+    insurance_policy = db.Column(db.String(50), nullable=True)
+    insurance_expiry = db.Column(db.Date, nullable=True)
+    registration_expiry = db.Column(db.Date, nullable=True)
+    dot_number = db.Column(db.String(20), nullable=True)
+    
+    # Financial Information
+    purchase_date = db.Column(db.Date, nullable=True)
+    purchase_price = db.Column(db.Float, nullable=True)
+    current_value = db.Column(db.Float, nullable=True)
+    
+    # Notes
+    notes = db.Column(db.Text, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    tickets = db.relationship('Ticket', backref='truck', lazy=True, foreign_keys='Ticket.truck_id')
+    
+    def __repr__(self):
+        return f'<Truck {self.truck_number}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'truck_number': self.truck_number,
+            'license_plate': self.license_plate,
+            'make': self.make,
+            'model': self.model,
+            'year': self.year,
+            'tank_capacity': self.tank_capacity,
+            'pump_type': self.pump_type,
+            'status': self.status,
+            'current_mileage': self.current_mileage,
+            'engine_hours': self.engine_hours,
+            'storage_location': self.storage_location.name if self.storage_location else None,
+            'last_maintenance': self.last_maintenance.isoformat() if self.last_maintenance else None,
+            'next_maintenance_due': self.next_maintenance_due.isoformat() if self.next_maintenance_due else None
+        }
+
+class TeamMember(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Basic Information
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    employee_id = db.Column(db.String(20), unique=True, nullable=True)
+    
+    # Contact Information
+    phone_primary = db.Column(db.String(20), nullable=True)
+    phone_secondary = db.Column(db.String(20), nullable=True)
+    email = db.Column(db.String(100), nullable=True)
+    
+    # Home Address
+    home_street_address = db.Column(db.String(200), nullable=True)
+    home_city = db.Column(db.String(100), nullable=True)
+    home_state = db.Column(db.String(50), nullable=True)
+    home_zip_code = db.Column(db.String(20), nullable=True)
+    
+    # Emergency Contact
+    emergency_contact_name = db.Column(db.String(100), nullable=True)
+    emergency_contact_phone = db.Column(db.String(20), nullable=True)
+    emergency_contact_relationship = db.Column(db.String(50), nullable=True)
+    
+    # Employment Information
+    position = db.Column(db.String(100), nullable=True)  # Technician, Driver, Supervisor, etc.
+    department = db.Column(db.String(50), nullable=True, default='field_service')
+    hire_date = db.Column(db.Date, nullable=True)
+    employment_status = db.Column(db.String(20), nullable=False, default='active')  # active, inactive, terminated
+    
+    # Certifications & Licenses
+    cdl_license = db.Column(db.Boolean, default=False)
+    cdl_expiry = db.Column(db.Date, nullable=True)
+    septic_certification = db.Column(db.Boolean, default=False)
+    septic_cert_expiry = db.Column(db.Date, nullable=True)
+    other_certifications = db.Column(db.Text, nullable=True)
+    
+    # Work Schedule
+    shift_start_time = db.Column(db.Time, nullable=True)
+    shift_end_time = db.Column(db.Time, nullable=True)
+    work_days = db.Column(db.String(20), nullable=True, default='weekdays')  # weekdays, weekends, all
+    
+    # Performance & Notes
+    notes = db.Column(db.Text, nullable=True)
+    is_supervisor = db.Column(db.Boolean, default=False)
+    can_operate_trucks = db.Column(db.Boolean, default=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships - Note: assigned_technician in Ticket is currently a string field
+    
+    def __repr__(self):
+        return f'<TeamMember {self.first_name} {self.last_name}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'employee_id': self.employee_id,
+            'position': self.position,
+            'phone_primary': self.phone_primary,
+            'email': self.email,
+            'home_address': f"{self.home_street_address}, {self.home_city}, {self.home_state}" if self.home_street_address else None,
+            'employment_status': self.employment_status,
+            'hire_date': self.hire_date.isoformat() if self.hire_date else None,
+            'cdl_license': self.cdl_license,
+            'septic_certification': self.septic_certification
+        }

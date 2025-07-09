@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit Location' if location else 'Add Location' }} - TrueTank{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-header">
+        <h2>{{ 'Edit Location' if location else 'Add Location' }}</h2>
+        <div class="form-actions">
+            <a href="{{ url_for('fleet_manager') }}" class="btn btn-secondary">← Back to Fleet</a>
+        </div>
+    </div>
+
+    <form id="location-form" class="ticket-form">
+        {% if location %}
+            <input type="hidden" id="location-id" value="{{ location.id }}">
+        {% endif %}
+        
+        <div class="form-grid">
+            <!-- Location Details -->
+            <div class="form-section">
+                <h3>Location Details</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Location Name *</label>
+                        <input type="text" id="name" name="name" value="{{ location.name if location else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="location_type">Location Type</label>
+                        <select id="location_type" name="location_type">
+                            <option value="office" {{ 'selected' if location and location.location_type == 'office' else '' }}>Office</option>
+                            <option value="storage" {{ 'selected' if location and location.location_type == 'storage' else '' }}>Storage</option>
+                            <option value="depot" {{ 'selected' if location and location.location_type == 'depot' else '' }}>Depot</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Address -->
+            <div class="form-section">
+                <h3>Address</h3>
+                
+                <div class="form-group">
+                    <label for="street_address">Street Address *</label>
+                    <input type="text" id="street_address" name="street_address" value="{{ location.street_address if location else '' }}" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city">City *</label>
+                        <input type="text" id="city" name="city" value="{{ location.city if location else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="state">State *</label>
+                        <input type="text" id="state" name="state" value="{{ location.state if location else '' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="zip_code">ZIP Code *</label>
+                        <input type="text" id="zip_code" name="zip_code" value="{{ location.zip_code if location else '' }}" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="form-section">
+                <h3>Contact Information</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="contact_person">Contact Person</label>
+                        <input type="text" id="contact_person" name="contact_person" value="{{ location.contact_person if location else '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone_number">Phone Number</label>
+                        <input type="tel" id="phone_number" name="phone_number" value="{{ location.phone_number if location else '' }}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Details -->
+            <div class="form-section">
+                <h3>Additional Details</h3>
+                
+                <div class="form-group">
+                    <label for="capacity_notes">Capacity Notes</label>
+                    <textarea id="capacity_notes" name="capacity_notes" rows="2" placeholder="How many trucks can be stored here...">{{ location.capacity_notes if location else '' }}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="access_notes">Access Notes</label>
+                    <textarea id="access_notes" name="access_notes" rows="2" placeholder="Gate codes, parking instructions, etc...">{{ location.access_notes if location else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Update Location' if location else 'Create Location' }}</button>
+            <a href="{{ url_for('fleet_manager') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('location-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+        
+        const locationId = document.getElementById('location-id');
+        const isEdit = locationId && locationId.value;
+        
+        const url = isEdit ? `/api/locations/${locationId.value}` : '/api/locations';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                alert('Error: ' + result.error);
+            } else {
+                alert(`Location ${isEdit ? 'updated' : 'created'} successfully!`);
+                window.location.href = '/fleet';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(`Failed to ${isEdit ? 'update' : 'create'} location. Please try again.`);
+        });
+    });
+});
+</script>
+{% endblock %}

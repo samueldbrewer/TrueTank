@@ -181,6 +181,14 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Check for customer_id in URL parameters and pre-select customer
+    const urlParams = new URLSearchParams(window.location.search);
+    const customerId = urlParams.get('customer_id');
+    if (customerId) {
+        const customerSelect = document.getElementById('customer_id');
+        customerSelect.value = customerId;
+    }
+
     document.getElementById('septic-system-form').addEventListener('submit', function(e) {
         e.preventDefault();
         
