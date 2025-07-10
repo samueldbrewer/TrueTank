@@ -476,51 +476,20 @@
 }
 
 /* Drag and Drop Enhancements */
-.ghost-card {
-    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 25%, transparent 25%, transparent 50%, rgba(52, 152, 219, 0.1) 50%, rgba(52, 152, 219, 0.1) 75%, transparent 75%);
-    background-size: 8px 8px;
+.ticket-list.drag-over {
+    background-color: rgba(52, 152, 219, 0.1);
     border: 2px dashed #3498db;
     border-radius: 6px;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    min-height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #3498db;
-    font-style: italic;
-    opacity: 0.8;
     transition: all 0.2s ease;
-    animation: pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
-    0%, 100% { 
-        opacity: 0.6;
-        transform: scale(0.98);
-    }
-    50% { 
-        opacity: 0.9;
-        transform: scale(1.02);
-    }
-}
-
-.ticket-list.drag-over {
-    background-color: rgba(52, 152, 219, 0.05);
-    border-radius: 6px;
-}
-
-.ticket-card.ghost-placeholder {
-    opacity: 0.5;
-    background: linear-gradient(135deg, #ecf0f1 25%, transparent 25%, transparent 50%, #ecf0f1 50%, #ecf0f1 75%, transparent 75%);
-    background-size: 10px 10px;
-    border: 2px dashed #bdc3c7;
-    color: #7f8c8d;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-style: italic;
-    min-height: 80px;
+.ticket-card.dragging,
+.ticket-card-compact.dragging {
+    opacity: 0.6;
+    transform: rotate(2deg) scale(0.95);
+    transition: all 0.2s ease;
+    z-index: 1000;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
 }
 
 /* Compact Ticket Cards for Truck Columns */
@@ -1117,24 +1086,18 @@ function updatePendingCount(count) {
 
 // Drag and Drop Functions
 let draggedTicket = null;
-let currentGhostCard = null;
 let targetPosition = null;
 
 function handleDragStart(e) {
     draggedTicket = e.target;
     e.target.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    
-    // Create ghost cards in all ticket lists
-    createGhostCards();
 }
 
 function handleDragEnd(e) {
     e.target.classList.remove('dragging');
     draggedTicket = null;
-    
-    // Remove all ghost cards
-    removeGhostCards();
+    targetPosition = null;
     
     // Remove drag-over class from all lists
     document.querySelectorAll('.ticket-list').forEach(list => {
@@ -1152,12 +1115,10 @@ function handleDragOver(e) {
     const pendingColumn = ticketList.closest('.pending-column');
     const sourcePendingColumn = draggedTicket?.closest('.pending-column');
     
-    // Remove drag-over from all other lists and hide their ghost cards
+    // Remove drag-over from all other lists
     document.querySelectorAll('.ticket-list').forEach(list => {
         if (list !== ticketList) {
             list.classList.remove('drag-over');
-            const ghostCard = list.querySelector('.ghost-card');
-            if (ghostCard) ghostCard.style.display = 'none';
         }
     });
     
@@ -1169,57 +1130,23 @@ function handleDragOver(e) {
     // Add drag-over visual feedback to current list
     ticketList.classList.add('drag-over');
     
-    // Show and position ghost card (but not for pending column reordering)
-    if (!(pendingColumn && sourcePendingColumn)) {
-        updateGhostCardPosition(e, ticketList);
-    }
+    // Calculate drop position
+    updateTargetPosition(e, ticketList);
 }
 
-function createGhostCards() {
-    document.querySelectorAll('.ticket-list').forEach(ticketList => {
-        // Remove existing ghost card if any
-        const existingGhost = ticketList.querySelector('.ghost-card');
-        if (existingGhost) existingGhost.remove();
-        
-        // Create new ghost card
-        const ghostCard = document.createElement('div');
-        ghostCard.className = 'ghost-card';
-        ghostCard.textContent = 'Drop ticket here';
-        ghostCard.style.display = 'none';
-        
-        // Add to beginning of list
-        ticketList.insertBefore(ghostCard, ticketList.firstChild);
-    });
-}
-
-function removeGhostCards() {
-    document.querySelectorAll('.ghost-card').forEach(ghost => {
-        ghost.remove();
-    });
-    currentGhostCard = null;
-    targetPosition = null;
-}
-
-function updateGhostCardPosition(e, ticketList) {
-    const ghostCard = ticketList.querySelector('.ghost-card');
-    if (!ghostCard) return;
-    
-    ghostCard.style.display = 'flex';
-    currentGhostCard = ghostCard;
-    
-    // Select both regular and compact ticket cards, excluding the dragging one and ghost card
-    const tickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging):not(.ghost-card), .ticket-card-compact:not(.dragging):not(.ghost-card)'));
+function updateTargetPosition(e, ticketList) {
+    // Select both regular and compact ticket cards, excluding the dragging one
+    const tickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging), .ticket-card-compact:not(.dragging)'));
     let insertPosition = 0;
     
     // Get the mouse position relative to the ticket list
     const listRect = ticketList.getBoundingClientRect();
     const relativeY = e.clientY - listRect.top;
     
-    // Find where to position the ghost card with better accuracy
+    // Find where to position the dropped ticket
     for (let i = 0; i < tickets.length; i++) {
         const ticketRect = tickets[i].getBoundingClientRect();
         const ticketTop = ticketRect.top - listRect.top;
-        const ticketBottom = ticketTop + ticketRect.height;
         const ticketMiddle = ticketTop + (ticketRect.height / 2);
         
         if (relativeY <= ticketMiddle) {
@@ -1228,22 +1155,6 @@ function updateGhostCardPosition(e, ticketList) {
         } else {
             insertPosition = i + 1;
         }
-    }
-    
-    // Move ghost card to the correct position
-    if (insertPosition === 0) {
-        // Insert at beginning
-        if (tickets.length > 0) {
-            ticketList.insertBefore(ghostCard, tickets[0]);
-        } else {
-            ticketList.appendChild(ghostCard);
-        }
-    } else if (insertPosition >= tickets.length) {
-        // Insert at end
-        ticketList.appendChild(ghostCard);
-    } else {
-        // Insert before the ticket at insertPosition
-        ticketList.insertBefore(ghostCard, tickets[insertPosition]);
     }
     
     targetPosition = insertPosition;
@@ -1265,7 +1176,7 @@ function handleDrop(e) {
         const sourceTruckId = draggedTicket.closest('.truck-column')?.dataset.truckId;
         const sourcePendingColumn = draggedTicket.closest('.pending-column');
         
-        // Use the targetPosition from the ghost card
+        // Use the calculated targetPosition
         const routePosition = targetPosition;
         
         // If moving within the same truck, handle reordering
