@@ -79,6 +79,7 @@
             </div>
         </div>
     </div>
+
 </div>
 
 <style>
@@ -173,10 +174,16 @@
 }
 
 .pending-column {
-    background: #f8f9fa;
+    background: #f5f5f5;
     border-radius: 8px;
     padding: 1rem;
     overflow-y: auto;
+}
+
+/* Ensure pending tickets have white background */
+.pending-column .ticket-card {
+    background-color: #ffffff;
+    background: white;
 }
 
 .column-header {
@@ -211,7 +218,7 @@
 }
 
 .truck-column {
-    background: white;
+    background: #f5f5f5;
     border: 1px solid #ddd;
     border-radius: 8px;
     min-height: 400px;
@@ -257,18 +264,21 @@
 }
 
 .ticket-card {
+    background-color: #ffffff !important;
     background: white;
     border: 1px solid #ddd;
     border-radius: 6px;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    margin-bottom: 0.35rem;
     cursor: move;
     transition: all 0.2s ease;
-    border-left: 4px solid #3498db;
+    border-left: 3px solid #3498db;
+    min-height: 60px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .ticket-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
     transform: translateY(-1px);
 }
 
@@ -307,10 +317,10 @@
 }
 
 .priority-badge {
-    padding: 0.125rem 0.375rem;
-    border-radius: 8px;
-    font-size: 0.7rem;
-    font-weight: bold;
+    padding: 0.15rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 600;
     text-transform: uppercase;
 }
 
@@ -347,9 +357,9 @@
 }
 
 .ticket-due {
-    color: #e67e22;
-    font-size: 0.8rem;
-    font-style: italic;
+    color: #95a5a6;
+    font-size: 0.75rem;
+    margin-top: 0.2rem;
 }
 
 .ticket-actions {
@@ -446,6 +456,127 @@
     min-height: 80px;
 }
 
+/* Compact Ticket Cards for Truck Columns */
+.ticket-card-compact {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-bottom: 0.35rem;
+    cursor: move;
+    transition: all 0.2s ease;
+    border-left: 3px solid #3498db;
+    min-height: 45px;
+}
+
+.ticket-card-compact:hover {
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.ticket-card-compact.priority-urgent {
+    border-left-color: #e74c3c;
+}
+
+.ticket-card-compact.priority-high {
+    border-left-color: #f39c12;
+}
+
+.ticket-card-compact.priority-medium {
+    border-left-color: #3498db;
+}
+
+.ticket-card-compact.priority-low {
+    border-left-color: #95a5a6;
+}
+
+.ticket-card-compact.dragging {
+    opacity: 0.5;
+    transform: rotate(3deg);
+}
+
+.compact-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.compact-job-id {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.compact-service {
+    color: #7f8c8d;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-compact-action {
+    background: #3498db;
+    color: white;
+    border: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+    line-height: 1;
+}
+
+.btn-compact-action:hover {
+    background: #2980b9;
+}
+
+/* Pending Card Styles - Match compact design but with more info */
+.pending-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.pending-job-id {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.pending-customer {
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 0.2rem;
+    font-size: 0.85rem;
+}
+
+.pending-service {
+    color: #7f8c8d;
+    font-size: 0.8rem;
+    margin-bottom: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pending-address {
+    color: #95a5a6;
+    font-size: 0.75rem;
+    margin-bottom: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-style: italic;
+}
+
 /* Modal Styles */
 .modal {
     position: fixed;
@@ -502,6 +633,7 @@
     border-top: 1px solid #ecf0f1;
 }
 
+
 @media (max-width: 768px) {
     .truck-scheduler {
         grid-template-columns: 1fr;
@@ -533,6 +665,11 @@ let teamAssignments = {};
 let allPendingTickets = []; // Store all pending tickets for search functionality
 let currentSearchTerm = '';
 let currentSortBy = 'oldest';
+
+// Click vs Drag detection
+let mouseDownTime = 0;
+let mouseDownPos = {x: 0, y: 0};
+let isDragging = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize date picker with today's date
@@ -661,43 +798,56 @@ function renderTruckColumns(trucks, schedules) {
 
 function createTicketCard(ticket, context = 'pending') {
     const card = document.createElement('div');
-    card.className = `ticket-card priority-${ticket.priority}`;
-    card.draggable = true;
     card.dataset.ticketId = ticket.id;
     card.dataset.context = context;
     
-    let dueDate = '';
-    if (ticket.requested_service_date) {
-        const due = new Date(ticket.requested_service_date);
-        dueDate = `<div class="ticket-due">Due: ${due.toLocaleDateString()}</div>`;
-    }
-    
-    // Add actions for truck context
-    let actions = '';
     if (context === 'truck') {
-        actions = `
-            <div class="ticket-actions">
-                <button class="btn-action" onclick="moveTicketToPending(${ticket.id})" title="Move to Pending">
-                    ← Pending
-                </button>
+        // Compact truck view - thinner card with just job ID and service type
+        card.className = `ticket-card-compact priority-${ticket.priority}`;
+        card.draggable = true; // Enable dragging for truck tickets
+        card.innerHTML = `
+            <div class="compact-header">
+                <span class="compact-job-id">${ticket.job_id}</span>
+                <button class="btn-compact-action" onclick="event.stopPropagation(); moveTicketToPending(${ticket.id})" title="Move back to Pending">←</button>
             </div>
+            <div class="compact-service">${ticket.service_type || 'Service'}</div>
         `;
+        // Add drag event listeners for truck tickets
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+        // Add click handler for expansion
+        card.addEventListener('mousedown', handleCardMouseDown);
+        card.addEventListener('mouseup', handleCardMouseUp);
+        card.addEventListener('click', handleCardClick);
+    } else {
+        // Full pending view - detailed card with all information
+        card.className = `ticket-card priority-${ticket.priority}`;
+        card.draggable = true; // Enable dragging for pending tickets to assign to trucks
+        
+        let dueDate = '';
+        if (ticket.requested_service_date) {
+            const due = new Date(ticket.requested_service_date);
+            dueDate = `<div class="ticket-due">Due: ${due.toLocaleDateString()}</div>`;
+        }
+        
+        card.innerHTML = `
+            <div class="pending-header">
+                <span class="pending-job-id">${ticket.job_id}</span>
+                <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
+            </div>
+            <div class="pending-customer">${ticket.customer_name || 'No customer'}</div>
+            <div class="pending-address">${ticket.customer_address || 'No address'}</div>
+            <div class="pending-service">${ticket.service_type || 'No service type'}</div>
+            ${dueDate}
+        `;
+        // Add drag event listeners for pending tickets
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+        // Add click handler for expansion
+        card.addEventListener('mousedown', handleCardMouseDown);
+        card.addEventListener('mouseup', handleCardMouseUp);
+        card.addEventListener('click', handleCardClick);
     }
-    
-    card.innerHTML = `
-        <div class="ticket-header">
-            <span class="ticket-id">${ticket.job_id}</span>
-            <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
-        </div>
-        <div class="ticket-customer">${ticket.customer_name || 'No customer'}</div>
-        <div class="ticket-service">${ticket.service_type || 'No service type'}</div>
-        ${dueDate}
-        ${actions}
-    `;
-    
-    // Add drag event listeners
-    card.addEventListener('dragstart', handleDragStart);
-    card.addEventListener('dragend', handleDragEnd);
     
     return card;
 }
@@ -775,6 +925,9 @@ function handleDragOver(e) {
     const ticketList = e.target.closest('.ticket-list');
     if (!ticketList) return;
     
+    const pendingColumn = ticketList.closest('.pending-column');
+    const sourcePendingColumn = draggedTicket?.closest('.pending-column');
+    
     // Remove drag-over from all other lists and hide their ghost cards
     document.querySelectorAll('.ticket-list').forEach(list => {
         if (list !== ticketList) {
@@ -784,11 +937,18 @@ function handleDragOver(e) {
         }
     });
     
+    // Don't show drag-over effects when trying to reorder within pending column
+    if (pendingColumn && sourcePendingColumn) {
+        return; // Don't show any drag feedback for pending-to-pending
+    }
+    
     // Add drag-over visual feedback to current list
     ticketList.classList.add('drag-over');
     
-    // Show and position ghost card
-    updateGhostCardPosition(e, ticketList);
+    // Show and position ghost card (but not for pending column reordering)
+    if (!(pendingColumn && sourcePendingColumn)) {
+        updateGhostCardPosition(e, ticketList);
+    }
 }
 
 function createGhostCards() {
@@ -823,26 +983,37 @@ function updateGhostCardPosition(e, ticketList) {
     ghostCard.style.display = 'flex';
     currentGhostCard = ghostCard;
     
-    const tickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging)'));
+    // Select both regular and compact ticket cards, excluding the dragging one and ghost card
+    const tickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging):not(.ghost-card), .ticket-card-compact:not(.dragging):not(.ghost-card)'));
     let insertPosition = 0;
     
-    // Find where to position the ghost card
+    // Get the mouse position relative to the ticket list
+    const listRect = ticketList.getBoundingClientRect();
+    const relativeY = e.clientY - listRect.top;
+    
+    // Find where to position the ghost card with better accuracy
     for (let i = 0; i < tickets.length; i++) {
         const ticketRect = tickets[i].getBoundingClientRect();
-        const ticketMiddle = ticketRect.top + ticketRect.height / 2;
+        const ticketTop = ticketRect.top - listRect.top;
+        const ticketBottom = ticketTop + ticketRect.height;
+        const ticketMiddle = ticketTop + (ticketRect.height / 2);
         
-        if (e.clientY > ticketMiddle) {
-            insertPosition = i + 1;
-        } else {
+        if (relativeY <= ticketMiddle) {
             insertPosition = i;
             break;
+        } else {
+            insertPosition = i + 1;
         }
     }
     
     // Move ghost card to the correct position
     if (insertPosition === 0) {
         // Insert at beginning
-        ticketList.insertBefore(ghostCard, ticketList.firstChild);
+        if (tickets.length > 0) {
+            ticketList.insertBefore(ghostCard, tickets[0]);
+        } else {
+            ticketList.appendChild(ghostCard);
+        }
     } else if (insertPosition >= tickets.length) {
         // Insert at end
         ticketList.appendChild(ghostCard);
@@ -868,6 +1039,7 @@ function handleDrop(e) {
         const truckId = truckColumn.dataset.truckId;
         const ticketId = draggedTicket.dataset.ticketId;
         const sourceTruckId = draggedTicket.closest('.truck-column')?.dataset.truckId;
+        const sourcePendingColumn = draggedTicket.closest('.pending-column');
         
         // Use the targetPosition from the ghost card
         const routePosition = targetPosition;
@@ -876,13 +1048,19 @@ function handleDrop(e) {
         if (sourceTruckId === truckId) {
             reorderTicketInTruck(ticketId, truckId, routePosition);
         } else {
-            // Assign ticket to different truck
+            // Assign ticket to different truck (from pending or different truck)
             assignTicketToTruck(ticketId, truckId, routePosition);
         }
     } else if (pendingColumn) {
-        // Move ticket back to pending
-        const ticketId = draggedTicket.dataset.ticketId;
-        moveTicketToPending(ticketId);
+        const sourcePendingColumn = draggedTicket.closest('.pending-column');
+        
+        // Only allow dropping tickets back to pending from trucks, not reordering within pending
+        if (!sourcePendingColumn) {
+            // Move ticket back to pending from a truck
+            const ticketId = draggedTicket.dataset.ticketId;
+            moveTicketToPending(ticketId);
+        }
+        // If source is pending column, ignore the drop (no reordering in pending)
     }
 }
 
@@ -1011,10 +1189,47 @@ function saveTeamAssignment() {
     closeTeamModal();
 }
 
+// Click vs Drag Detection Functions
+function handleCardMouseDown(e) {
+    mouseDownTime = Date.now();
+    mouseDownPos = {x: e.clientX, y: e.clientY};
+    isDragging = false;
+}
+
+function handleCardMouseUp(e) {
+    const timeDiff = Date.now() - mouseDownTime;
+    const distance = Math.sqrt(
+        Math.pow(e.clientX - mouseDownPos.x, 2) + 
+        Math.pow(e.clientY - mouseDownPos.y, 2)
+    );
+    
+    // If it was a short time and small movement, treat as click
+    isDragging = timeDiff > 200 || distance > 10;
+}
+
+function handleCardClick(e) {
+    // Don't trigger click if it was a drag operation
+    if (isDragging) {
+        return;
+    }
+    
+    // Don't trigger if clicking on action buttons
+    if (e.target.classList.contains('btn-compact-action') || 
+        e.target.classList.contains('priority-badge')) {
+        return;
+    }
+    
+    const ticketId = e.currentTarget.dataset.ticketId;
+    
+    // Navigate directly to the ticket detail page
+    window.location.href = `/ticket/${ticketId}`;
+}
+
 // Close modal when clicking outside
 window.onclick = function(event) {
-    const modal = document.getElementById('team-assignment-modal');
-    if (event.target === modal) {
+    const teamModal = document.getElementById('team-assignment-modal');
+    
+    if (event.target === teamModal) {
         closeTeamModal();
     }
 }

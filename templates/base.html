@@ -10,12 +10,19 @@
     <header>
         <h1>TrueTank</h1>
         <nav>
-            <a href="{{ url_for('index') }}">Dashboard</a>
-            <a href="{{ url_for('job_board') }}">Job Board</a>
-            <a href="{{ url_for('customers_view') }}">Customers</a>
-            <a href="{{ url_for('fleet_manager') }}">Fleet</a>
-            <a href="{{ url_for('team_manager') }}">Team</a>
-            <a href="{{ url_for('database_view') }}">Jobs</a>
+            <div class="nav-group">
+                <span class="nav-label">Main</span>
+                <a href="{{ url_for('index') }}">Dashboard</a>
+                <a href="{{ url_for('job_board') }}">Job Board</a>
+            </div>
+            <div class="nav-separator"></div>
+            <div class="nav-group">
+                <span class="nav-label">Operations</span>
+                <a href="{{ url_for('customers_view') }}">Customers</a>
+                <a href="{{ url_for('fleet_manager') }}">Fleet</a>
+                <a href="{{ url_for('team_manager') }}">Team</a>
+                <a href="{{ url_for('database_view') }}">Jobs</a>
+            </div>
         </nav>
     </header>
     
