@@ -6,6 +6,12 @@
 <div class="container">
     <div class="form-header">
         <h2>{{ 'Edit Customer' if customer else 'Create Customer' }}</h2>
+        <!-- AI Property Data Indicator -->
+        <div id="ai-property-banner" class="ai-property-banner" style="display: none;">
+            <span class="ai-icon">🤖</span>
+            <span class="ai-text">This form has been pre-filled with AI property data</span>
+            <button type="button" class="clear-ai-btn" onclick="clearAIPropertyData()">Clear AI Data</button>
+        </div>
         <div class="form-actions">
             <a href="{{ url_for('customers_view') }}" class="btn btn-secondary">← Back to Customers</a>
         </div>
@@ -183,8 +189,179 @@
     </form>
 </div>
 
+<style>
+/* AI Property Data Banner */
+.ai-property-banner {
+    background: linear-gradient(135deg, #e8f5e8, #f0fff0);
+    border: 1px solid #4caf50;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.1);
+}
+
+.ai-icon {
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+}
+
+.ai-property-banner .ai-text {
+    flex: 1;
+    color: #388e3c;
+    font-weight: 500;
+}
+
+.ai-property-banner .clear-ai-btn {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+}
+
+.ai-property-banner .clear-ai-btn:hover {
+    background: #45a049;
+}
+
+/* AI-filled field indicator */
+.ai-filled {
+    background-color: #f0fff0 !important;
+    border-color: #4caf50 !important;
+}
+
+.ai-filled:focus {
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2) !important;
+}
+</style>
+
 <script>
+// AI Property Data Functions
+function loadAIPropertyData() {
+    try {
+        const propertyData = sessionStorage.getItem('ai_property_data');
+        if (!propertyData) {
+            console.log('No AI property data found in session storage');
+            return;
+        }
+        
+        const property = JSON.parse(propertyData);
+        console.log('Loading AI property data:', property);
+        
+        // Show AI banner
+        document.getElementById('ai-property-banner').style.display = 'flex';
+        
+        // Parse address data from the full address string
+        if (property.address) {
+            const addressParts = parseAddress(property.address);
+            
+            // Fill address fields and mark them as AI-filled
+            if (addressParts.street) {
+                const streetField = document.getElementById('street_address');
+                streetField.value = addressParts.street;
+                streetField.classList.add('ai-filled');
+            }
+            
+            if (addressParts.city) {
+                const cityField = document.getElementById('city');
+                cityField.value = addressParts.city;
+                cityField.classList.add('ai-filled');
+            }
+            
+            if (addressParts.state) {
+                const stateField = document.getElementById('state');
+                stateField.value = addressParts.state;
+                stateField.classList.add('ai-filled');
+            }
+            
+            if (addressParts.zip) {
+                const zipField = document.getElementById('zip_code');
+                zipField.value = addressParts.zip;
+                zipField.classList.add('ai-filled');
+            }
+        }
+        
+        // Set default customer type based on property type
+        if (property.property_type) {
+            const customerTypeField = document.getElementById('customer_type');
+            if (property.property_type === 'commercial') {
+                customerTypeField.value = 'commercial';
+            } else {
+                customerTypeField.value = 'residential';
+            }
+            customerTypeField.classList.add('ai-filled');
+        }
+        
+        console.log('AI property data applied to form');
+        
+    } catch (error) {
+        console.error('Error loading AI property data:', error);
+    }
+}
+
+function parseAddress(fullAddress) {
+    // Simple address parser - can be enhanced for better accuracy
+    const parts = fullAddress.split(',').map(part => part.trim());
+    
+    const result = {
+        street: '',
+        city: '',
+        state: '',
+        zip: ''
+    };
+    
+    if (parts.length >= 3) {
+        result.street = parts[0];
+        result.city = parts[1];
+        
+        // Parse state and zip from last part
+        const stateZipPart = parts[parts.length - 1];
+        const stateZipMatch = stateZipPart.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+        if (stateZipMatch) {
+            result.state = stateZipMatch[1];
+            result.zip = stateZipMatch[2];
+        } else {
+            // Fallback - assume it's just state
+            result.state = stateZipPart;
+        }
+    }
+    
+    return result;
+}
+
+function clearAIPropertyData() {
+    // Remove AI data from session storage
+    sessionStorage.removeItem('ai_property_data');
+    
+    // Hide banner
+    document.getElementById('ai-property-banner').style.display = 'none';
+    
+    // Clear AI-filled fields and remove styling
+    document.querySelectorAll('.ai-filled').forEach(field => {
+        field.classList.remove('ai-filled');
+        if (field.tagName === 'SELECT') {
+            field.value = field.querySelector('option[selected]')?.value || '';
+        } else if (field.tagName === 'INPUT') {
+            field.value = '';
+        }
+    });
+    
+    console.log('AI property data cleared');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Check for AI estimate data and auto-fill form
+    const urlParams = new URLSearchParams(window.location.search);
+    const aiEstimate = urlParams.get('ai_estimate');
+    if (aiEstimate === 'true') {
+        loadAIPropertyData();
+    }
+    
     const billingCheckbox = document.getElementById('billing_same_as_service');
     const billingAddress = document.getElementById('billing-address');
     
@@ -261,7 +438,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Error creating customer: ' + result.error);
                 } else {
                     alert('Customer created successfully!');
-                    window.location.href = '/customers';
+                    
+                    // Check if we came from AI estimator workflow
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const aiEstimate = urlParams.get('ai_estimate');
+                    
+                    if (aiEstimate === 'true') {
+                        // Redirect to septic system form with customer ID and AI estimate
+                        window.location.href = `/septic-system/create?customer_id=${result.customer_id}&ai_estimate=true`;
+                    } else {
+                        window.location.href = '/customers';
+                    }
                 }
             })
             .catch(error => {

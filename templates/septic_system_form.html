@@ -6,6 +6,12 @@
 <div class="container">
     <div class="form-header">
         <h2>{{ 'Edit Septic System' if septic_system else 'Create Septic System' }}</h2>
+        <!-- AI Estimate Indicator -->
+        <div id="ai-estimate-banner" class="ai-estimate-banner" style="display: none;">
+            <span class="ai-icon">🤖</span>
+            <span class="ai-text">This form has been pre-filled with AI-generated estimates</span>
+            <button type="button" class="clear-ai-btn" onclick="clearAIEstimate()">Clear AI Data</button>
+        </div>
         <div class="form-actions">
             <a href="{{ url_for('customers_view') }}" class="btn btn-secondary">← Back to Customers</a>
         </div>
@@ -54,7 +60,12 @@
                     </div>
                     <div class="form-group">
                         <label for="tank_size">Tank Size (gallons) *</label>
-                        <input type="number" id="tank_size" name="tank_size" value="{{ septic_system.tank_size if septic_system else '' }}" required>
+                        <div class="input-with-ai">
+                            <input type="number" id="tank_size" name="tank_size" value="{{ septic_system.tank_size if septic_system else '' }}" required>
+                            <button type="button" class="ai-estimate-btn" onclick="openAIEstimateModal()">
+                                🤖 AI Estimate
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -179,6 +190,387 @@
     </form>
 </div>
 
+<!-- AI Estimate Modal -->
+<div id="ai-estimate-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🤖 AI Septic System Estimate</h3>
+            <span class="close" onclick="closeAIEstimateModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Get an AI-powered septic system estimate based on property details:</p>
+            
+            <!-- Customer Address Display -->
+            <div id="customer-address-display" class="customer-address-display" style="display: none;">
+                <div class="address-label">Property Address:</div>
+                <div id="customer-address-text" class="address-text"></div>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ai-bedrooms">Number of Bedrooms *</label>
+                <select id="ai-bedrooms" required>
+                    <option value="">Select...</option>
+                    <option value="1">1 Bedroom</option>
+                    <option value="2">2 Bedrooms</option>
+                    <option value="3">3 Bedrooms</option>
+                    <option value="4">4 Bedrooms</option>
+                    <option value="5">5 Bedrooms</option>
+                    <option value="6">6+ Bedrooms</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ai-bathrooms">Number of Bathrooms</label>
+                <select id="ai-bathrooms">
+                    <option value="">Select...</option>
+                    <option value="1">1 Bathroom</option>
+                    <option value="1.5">1.5 Bathrooms</option>
+                    <option value="2">2 Bathrooms</option>
+                    <option value="2.5">2.5 Bathrooms</option>
+                    <option value="3">3 Bathrooms</option>
+                    <option value="3.5">3.5 Bathrooms</option>
+                    <option value="4">4+ Bathrooms</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ai-occupants">Expected Occupants</label>
+                <select id="ai-occupants">
+                    <option value="">Select...</option>
+                    <option value="1">1 Person</option>
+                    <option value="2">2 People</option>
+                    <option value="3">3 People</option>
+                    <option value="4">4 People</option>
+                    <option value="5">5 People</option>
+                    <option value="6">6+ People</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ai-property-type">Property Type</label>
+                <select id="ai-property-type">
+                    <option value="single_family">Single Family Home</option>
+                    <option value="townhouse">Townhouse</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="manufactured">Manufactured Home</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ai-soil-type">Soil Conditions</label>
+                <select id="ai-soil-type">
+                    <option value="normal">Normal/Unknown</option>
+                    <option value="clay">Clay Soil</option>
+                    <option value="sandy">Sandy Soil</option>
+                    <option value="rocky">Rocky Soil</option>
+                    <option value="high_water_table">High Water Table</option>
+                </select>
+            </div>
+            
+            <div id="ai-estimate-result" class="ai-estimate-result" style="display: none;">
+                <div class="estimate-card">
+                    <h4>🎯 AI Recommendation</h4>
+                    <div class="estimate-details">
+                        <div class="estimate-item">
+                            <span class="label">Tank Size:</span>
+                            <span class="value" id="ai-tank-size">-</span>
+                        </div>
+                        <div class="estimate-item">
+                            <span class="label">System Type:</span>
+                            <span class="value" id="ai-system-type">-</span>
+                        </div>
+                        <div class="estimate-item">
+                            <span class="label">Material:</span>
+                            <span class="value" id="ai-material">-</span>
+                        </div>
+                        <div class="estimate-item">
+                            <span class="label">Compartments:</span>
+                            <span class="value" id="ai-compartments">-</span>
+                        </div>
+                    </div>
+                    <div class="ai-notes" id="ai-notes"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeAIEstimateModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="generateQuickEstimate()" id="generate-btn">
+                Generate Estimate
+            </button>
+            <button class="btn btn-success" onclick="applyAIEstimate()" id="apply-btn" style="display: none;">
+                Apply to Form
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* AI Estimate Banner */
+.ai-estimate-banner {
+    background: linear-gradient(135deg, #e3f2fd, #f0f9ff);
+    border: 1px solid #2196f3;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 4px rgba(33, 150, 243, 0.1);
+}
+
+.ai-icon {
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+}
+
+.ai-text {
+    flex: 1;
+    color: #1976d2;
+    font-weight: 500;
+}
+
+.clear-ai-btn {
+    background: #1976d2;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+}
+
+.clear-ai-btn:hover {
+    background: #1565c0;
+}
+
+/* AI-filled field indicator */
+.ai-filled {
+    background-color: #f0f9ff !important;
+    border-color: #2196f3 !important;
+}
+
+.ai-filled:focus {
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2) !important;
+}
+
+/* AI Estimate Button */
+.input-with-ai {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.input-with-ai input {
+    flex: 1;
+}
+
+.ai-estimate-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+}
+
+.ai-estimate-btn:hover {
+    background: linear-gradient(135deg, #5855eb, #7c3aed);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #1f2937;
+}
+
+.close {
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    transition: color 0.3s;
+}
+
+.close:hover {
+    color: #ef4444;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.ai-form-group {
+    margin-bottom: 1rem;
+}
+
+.ai-form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.ai-form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.ai-form-group select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.ai-estimate-result {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.estimate-card h4 {
+    margin: 0 0 1rem 0;
+    color: #1e293b;
+}
+
+.estimate-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.estimate-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+.estimate-item .label {
+    font-weight: 500;
+    color: #64748b;
+}
+
+.estimate-item .value {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.ai-notes {
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    color: #92400e;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
+/* Customer Address Display */
+.customer-address-display {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.address-label {
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.address-text {
+    color: #1e293b;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .input-with-ai {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .ai-estimate-btn {
+        margin-top: 0.5rem;
+    }
+    
+    .estimate-details {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-actions {
+        flex-direction: column;
+    }
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Check for customer_id in URL parameters and pre-select customer
@@ -188,7 +580,283 @@ document.addEventListener('DOMContentLoaded', function() {
         const customerSelect = document.getElementById('customer_id');
         customerSelect.value = customerId;
     }
+    
+    // Check for AI estimate data and auto-fill form
+    const aiEstimate = urlParams.get('ai_estimate');
+    if (aiEstimate === 'true') {
+        loadAIEstimate();
+    }
+});
 
+// AI Estimate Functions
+function loadAIEstimate() {
+    try {
+        const estimateData = sessionStorage.getItem('ai_septic_estimate');
+        if (!estimateData) {
+            console.log('No AI estimate data found in session storage');
+            return;
+        }
+        
+        const estimate = JSON.parse(estimateData);
+        console.log('Loading AI estimate:', estimate);
+        
+        // Show AI banner
+        document.getElementById('ai-estimate-banner').style.display = 'flex';
+        
+        // Map AI estimate fields to form fields
+        const fieldMappings = {
+            'tank_size': estimate.tank_size,
+            'system_type': estimate.system_type,
+            'tank_material': estimate.tank_material,
+            'num_compartments': estimate.num_compartments,
+            'pump_frequency_months': estimate.pump_frequency_months
+        };
+        
+        // Fill form fields and mark them as AI-filled
+        Object.entries(fieldMappings).forEach(([fieldId, value]) => {
+            if (value !== undefined && value !== null) {
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.value = value;
+                    field.classList.add('ai-filled');
+                }
+            }
+        });
+        
+        // Handle installation notes if available
+        if (estimate.installation_notes) {
+            const accessNotes = document.getElementById('access_notes');
+            if (accessNotes && !accessNotes.value) {
+                accessNotes.value = `AI Notes: ${estimate.installation_notes}`;
+                accessNotes.classList.add('ai-filled');
+            }
+        }
+        
+        console.log('AI estimate applied to form');
+        
+    } catch (error) {
+        console.error('Error loading AI estimate:', error);
+    }
+}
+
+function clearAIEstimate() {
+    // Remove AI data from session storage
+    sessionStorage.removeItem('ai_septic_estimate');
+    
+    // Hide banner
+    document.getElementById('ai-estimate-banner').style.display = 'none';
+    
+    // Clear AI-filled fields and remove styling
+    document.querySelectorAll('.ai-filled').forEach(field => {
+        field.classList.remove('ai-filled');
+        if (field.tagName === 'SELECT') {
+            field.value = '';
+        } else if (field.tagName === 'INPUT') {
+            field.value = '';
+        } else if (field.tagName === 'TEXTAREA') {
+            field.value = '';
+        }
+    });
+    
+    console.log('AI estimate data cleared');
+}
+
+// AI Estimation Functions
+let currentAIEstimate = null;
+
+function openAIEstimateModal() {
+    // Get customer address if available
+    const customerSelect = document.getElementById('customer_id');
+    const selectedCustomerId = customerSelect.value;
+    
+    if (selectedCustomerId) {
+        // Show loading state
+        document.getElementById('ai-estimate-modal').style.display = 'flex';
+        document.getElementById('generate-btn').disabled = true;
+        document.getElementById('generate-btn').textContent = 'Loading customer info...';
+        
+        // Fetch customer details including address
+        fetch(`/api/customers/${selectedCustomerId}`)
+        .then(response => response.json())
+        .then(customer => {
+            // Store customer info for later use
+            window.currentCustomer = customer;
+            
+            // Display customer address
+            const addressDisplay = document.getElementById('customer-address-display');
+            const addressText = document.getElementById('customer-address-text');
+            if (customer.street_address) {
+                addressText.textContent = `${customer.street_address}, ${customer.city}, ${customer.state} ${customer.zip_code}`;
+                addressDisplay.style.display = 'block';
+            } else {
+                addressDisplay.style.display = 'none';
+            }
+            
+            // Pre-fill some reasonable defaults
+            document.getElementById('ai-bedrooms').value = '3';
+            document.getElementById('ai-bathrooms').value = '2';
+            document.getElementById('ai-occupants').value = '4';
+            document.getElementById('ai-property-type').value = 'single_family';
+            document.getElementById('ai-soil-type').value = 'normal';
+            
+            // Reset modal state
+            document.getElementById('ai-estimate-result').style.display = 'none';
+            document.getElementById('generate-btn').style.display = 'inline-block';
+            document.getElementById('apply-btn').style.display = 'none';
+            document.getElementById('generate-btn').disabled = false;
+            document.getElementById('generate-btn').textContent = 'Generate Estimate';
+        })
+        .catch(error => {
+            console.error('Error loading customer:', error);
+            alert('Could not load customer information');
+            closeAIEstimateModal();
+        });
+    } else {
+        alert('Please select a customer first');
+        return;
+    }
+}
+
+function closeAIEstimateModal() {
+    document.getElementById('ai-estimate-modal').style.display = 'none';
+}
+
+function generateQuickEstimate() {
+    const bedrooms = document.getElementById('ai-bedrooms').value;
+    const bathrooms = document.getElementById('ai-bathrooms').value;
+    const occupants = document.getElementById('ai-occupants').value;
+    const propertyType = document.getElementById('ai-property-type').value;
+    const soilType = document.getElementById('ai-soil-type').value;
+    
+    if (!bedrooms) {
+        alert('Please select number of bedrooms');
+        return;
+    }
+    
+    // Show loading state
+    const generateBtn = document.getElementById('generate-btn');
+    generateBtn.disabled = true;
+    generateBtn.textContent = '🤖 Generating...';
+    
+    // Prepare data for AI API - include customer address if available
+    let customerAddress = 'Property Address Not Available';
+    if (window.currentCustomer) {
+        const customer = window.currentCustomer;
+        customerAddress = `${customer.street_address}, ${customer.city}, ${customer.state} ${customer.zip_code}`;
+    }
+    
+    const propertyData = {
+        address: customerAddress,
+        customer_type: window.currentCustomer?.customer_type || 'residential',
+        bedrooms: parseInt(bedrooms),
+        bathrooms: parseFloat(bathrooms) || 2,
+        occupants: parseInt(occupants) || parseInt(bedrooms) + 1,
+        property_type: propertyType,
+        soil_type: soilType,
+        water_table: soilType === 'high_water_table' ? 'high' : 'normal',
+        property_size: propertyType === 'commercial' ? 2.0 : 1.0,
+        year_built: 2000
+    };
+    
+    // Call AI estimate API
+    fetch('/api/ai-estimate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ property_data: propertyData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Estimate';
+        
+        if (data.error) {
+            alert('Error generating estimate: ' + data.error);
+            return;
+        }
+        
+        // Store the estimate
+        currentAIEstimate = data;
+        
+        // Display results
+        displayQuickEstimate(data);
+        
+        // Show apply button
+        document.getElementById('generate-btn').style.display = 'none';
+        document.getElementById('apply-btn').style.display = 'inline-block';
+        document.getElementById('ai-estimate-result').style.display = 'block';
+    })
+    .catch(error => {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Estimate';
+        console.error('Error:', error);
+        alert('Failed to generate estimate. Please try again.');
+    });
+}
+
+function displayQuickEstimate(data) {
+    document.getElementById('ai-tank-size').textContent = data.tank_size + ' gallons';
+    document.getElementById('ai-system-type').textContent = (data.system_type || 'conventional').replace('_', ' ').toUpperCase();
+    document.getElementById('ai-material').textContent = (data.tank_material || 'concrete').toUpperCase();
+    document.getElementById('ai-compartments').textContent = data.num_compartments || '2';
+    
+    // Show installation notes
+    const notes = data.installation_notes || 'Standard residential installation recommended.';
+    document.getElementById('ai-notes').textContent = '💡 ' + notes;
+}
+
+function applyAIEstimate() {
+    if (!currentAIEstimate) {
+        alert('No estimate available');
+        return;
+    }
+    
+    // Apply to form fields
+    if (currentAIEstimate.tank_size) {
+        document.getElementById('tank_size').value = currentAIEstimate.tank_size;
+        document.getElementById('tank_size').classList.add('ai-filled');
+    }
+    
+    if (currentAIEstimate.system_type) {
+        document.getElementById('system_type').value = currentAIEstimate.system_type;
+        document.getElementById('system_type').classList.add('ai-filled');
+    }
+    
+    if (currentAIEstimate.tank_material) {
+        document.getElementById('tank_material').value = currentAIEstimate.tank_material;
+        document.getElementById('tank_material').classList.add('ai-filled');
+    }
+    
+    if (currentAIEstimate.num_compartments) {
+        document.getElementById('num_compartments').value = currentAIEstimate.num_compartments;
+        document.getElementById('num_compartments').classList.add('ai-filled');
+    }
+    
+    if (currentAIEstimate.pump_frequency_months) {
+        document.getElementById('pump_frequency_months').value = currentAIEstimate.pump_frequency_months;
+        document.getElementById('pump_frequency_months').classList.add('ai-filled');
+    }
+    
+    // Show AI banner
+    document.getElementById('ai-estimate-banner').style.display = 'flex';
+    
+    // Close modal
+    closeAIEstimateModal();
+    
+    // Scroll to tank size field
+    document.getElementById('tank_size').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('ai-estimate-modal');
+    if (event.target === modal) {
+        closeAIEstimateModal();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('septic-system-form').addEventListener('submit', function(e) {
         e.preventDefault();
         

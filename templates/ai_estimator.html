@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+
+{% block title %}AI Septic Estimator - TrueTank{% endblock %}
+
+{% block content %}
+<div class="ai-estimator-container">
+    <div class="estimator-header">
+        <h2>AI-Powered Septic System Estimator</h2>
+        <p class="subtitle">Enter a property address to get an AI-generated septic system estimate</p>
+    </div>
+    
+    <div class="estimator-workflow">
+        <!-- Step 1: Address Input -->
+        <div class="step-card active" id="step-address">
+            <div class="step-header">
+                <span class="step-number">1</span>
+                <h3>Enter Property Address</h3>
+            </div>
+            <div class="step-content">
+                <div class="form-group">
+                    <label for="property-address">Property Address</label>
+                    <input type="text" id="property-address" 
+                           placeholder="123 Main St, City, State ZIP" 
+                           class="form-control">
+                </div>
+                <button class="btn btn-primary" onclick="lookupProperty()">
+                    Lookup Property
+                </button>
+            </div>
+        </div>
+        
+        <!-- Step 2: Property Data Review -->
+        <div class="step-card" id="step-property">
+            <div class="step-header">
+                <span class="step-number">2</span>
+                <h3>Review Property Data</h3>
+            </div>
+            <div class="step-content">
+                <div id="property-data-display" class="property-grid">
+                    <!-- Property data will be displayed here -->
+                </div>
+                
+                <!-- Data Source Info -->
+                <div class="data-source-info" style="margin-top: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px; font-size: 0.9rem; color: #6c757d;">
+                    📍 <strong>Data Source:</strong> Real geocoding via OpenStreetMap + US Census Bureau
+                </div>
+                
+                <div class="step-actions">
+                    <button class="btn btn-secondary" onclick="editPropertyData()">
+                        Edit Data
+                    </button>
+                    <button class="btn btn-primary" onclick="generateEstimate()">
+                        Generate AI Estimate
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 3: AI Estimate Results -->
+        <div class="step-card" id="step-estimate">
+            <div class="step-header">
+                <span class="step-number">3</span>
+                <h3>Septic System Estimate</h3>
+            </div>
+            <div class="step-content">
+                <div id="estimate-results" class="estimate-grid">
+                    <!-- AI estimate will be displayed here -->
+                </div>
+                <div class="step-actions">
+                    <button class="btn btn-secondary" onclick="startOver()">
+                        New Estimate
+                    </button>
+                    <button class="btn btn-primary" onclick="applyToForm()">
+                        Apply to Septic System Form
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Indicator -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p id="loading-message">Looking up property data...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.ai-estimator-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.estimator-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.estimator-header h2 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: #7f8c8d;
+    font-size: 1.1rem;
+}
+
+.estimator-workflow {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.step-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 2rem;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+
+.step-card.active {
+    opacity: 1;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.step-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.step-number {
+    background: #3498db;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.step-card.active .step-number {
+    background: #27ae60;
+}
+
+.step-header h3 {
+    color: #2c3e50;
+    margin: 0;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.property-grid, .estimate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.data-item {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.data-label {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.data-value {
+    font-size: 1.1rem;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.step-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #3498db;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2980b9;
+}
+
+.btn-secondary {
+    background: #95a5a6;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #7f8c8d;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* AI Confidence Indicator */
+.confidence-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.confidence-high {
+    background: #d4edda;
+    color: #155724;
+}
+
+.confidence-medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.confidence-low {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .ai-estimator-container {
+        padding: 1rem;
+    }
+    
+    .step-card {
+        padding: 1.5rem;
+    }
+    
+    .property-grid, .estimate-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .step-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+let currentPropertyData = null;
+let currentEstimate = null;
+
+function lookupProperty() {
+    const address = document.getElementById('property-address').value.trim();
+    
+    if (!address) {
+        alert('Please enter a property address');
+        return;
+    }
+    
+    // Show loading
+    showLoading('Looking up property data...');
+    
+    // Call property lookup API
+    fetch('/api/property-lookup', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ address: address })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+        
+        currentPropertyData = data;
+        displayPropertyData(data);
+        
+        // Move to step 2
+        activateStep('step-property');
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        alert('Failed to lookup property data');
+    });
+}
+
+function displayPropertyData(data) {
+    const container = document.getElementById('property-data-display');
+    
+    const fields = [
+        { label: 'Address', key: 'address' },
+        { label: 'Property Size', key: 'property_size', suffix: ' acres' },
+        { label: 'Bedrooms', key: 'bedrooms' },
+        { label: 'Bathrooms', key: 'bathrooms' },
+        { label: 'Year Built', key: 'year_built' },
+        { label: 'Occupants', key: 'occupants' },
+        { label: 'Property Type', key: 'property_type', transform: (v) => v.replace('_', ' ').toUpperCase() },
+        { label: 'Soil Type', key: 'soil_type', transform: (v) => v.replace('_', ' ').toUpperCase() },
+        { label: 'Water Table', key: 'water_table', transform: (v) => v.toUpperCase() },
+        { label: 'City', key: 'city' },
+        { label: 'County', key: 'county' },
+        { label: 'State', key: 'state' },
+        { label: 'Coordinates', key: 'coordinates', transform: () => `${data.lat?.toFixed(4) || 'N/A'}, ${data.lng?.toFixed(4) || 'N/A'}` }
+    ];
+    
+    container.innerHTML = fields.map(field => {
+        let value = data[field.key] || 'Unknown';
+        if (field.transform) {
+            value = field.transform(value);
+        }
+        if (field.suffix && value !== 'Unknown') {
+            value += field.suffix;
+        }
+        
+        return `
+            <div class="data-item">
+                <div class="data-label">${field.label}</div>
+                <div class="data-value">${value}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function generateEstimate() {
+    if (!currentPropertyData) {
+        alert('No property data available');
+        return;
+    }
+    
+    // Show loading
+    showLoading('AI is analyzing property data and generating estimate...');
+    
+    // Call AI estimate API
+    fetch('/api/ai-estimate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ property_data: currentPropertyData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+        
+        currentEstimate = data;
+        displayEstimate(data);
+        
+        // Move to step 3
+        activateStep('step-estimate');
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error:', error);
+        alert('Failed to generate estimate');
+    });
+}
+
+function displayEstimate(data) {
+    const container = document.getElementById('estimate-results');
+    
+    const fields = [
+        { label: 'Tank Size', key: 'tank_size', suffix: ' gallons' },
+        { label: 'System Type', key: 'system_type', transform: (v) => v.replace('_', ' ').toUpperCase() },
+        { label: 'Tank Material', key: 'tank_material', transform: (v) => v.toUpperCase() },
+        { label: 'Compartments', key: 'num_compartments' },
+        { label: 'Pump Frequency', key: 'pump_frequency_months', suffix: ' months' },
+        { label: 'Est. Lifespan', key: 'estimated_lifespan_years', suffix: ' years' }
+    ];
+    
+    let html = fields.map(field => {
+        let value = data[field.key] || 'Unknown';
+        if (field.transform && typeof value === 'string') {
+            value = field.transform(value);
+        }
+        if (field.suffix && value !== 'Unknown') {
+            value += field.suffix;
+        }
+        
+        return `
+            <div class="data-item">
+                <div class="data-label">${field.label}</div>
+                <div class="data-value">${value}</div>
+            </div>
+        `;
+    }).join('');
+    
+    // Add installation notes
+    if (data.installation_notes) {
+        html += `
+            <div class="data-item" style="grid-column: 1 / -1;">
+                <div class="data-label">Installation Notes</div>
+                <div class="data-value" style="font-weight: normal; font-size: 0.95rem;">
+                    ${data.installation_notes}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Add confidence indicator
+    const confidence = data.ai_confidence || 'medium';
+    html += `
+        <div style="grid-column: 1 / -1; text-align: right;">
+            <span class="confidence-indicator confidence-${confidence}">
+                AI Confidence: ${confidence.toUpperCase()}
+            </span>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function editPropertyData() {
+    // In a real implementation, this would open a modal to edit the data
+    alert('Edit functionality would open a modal to modify property data');
+}
+
+function applyToForm() {
+    if (!currentEstimate) {
+        alert('No estimate available');
+        return;
+    }
+    
+    // Store estimate in session storage
+    sessionStorage.setItem('ai_septic_estimate', JSON.stringify(currentEstimate));
+    
+    // Get customer ID from the property address or create new customer
+    const customerId = prompt('Enter customer ID or leave blank to create new customer:');
+    
+    if (customerId) {
+        // Redirect to septic system form with customer ID
+        window.location.href = `/septic-system/create?customer_id=${customerId}&ai_estimate=true`;
+    } else {
+        // Redirect to customer creation with estimate data
+        sessionStorage.setItem('ai_property_data', JSON.stringify(currentPropertyData));
+        window.location.href = '/customer/create?ai_estimate=true';
+    }
+}
+
+function startOver() {
+    // Reset all data
+    currentPropertyData = null;
+    currentEstimate = null;
+    
+    // Clear form
+    document.getElementById('property-address').value = '';
+    
+    // Reset to step 1
+    activateStep('step-address');
+}
+
+function activateStep(stepId) {
+    // Remove active class from all steps
+    document.querySelectorAll('.step-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    // Add active class to target step
+    document.getElementById(stepId).classList.add('active');
+}
+
+function showLoading(message) {
+    document.getElementById('loading-message').textContent = message;
+    document.getElementById('loading-overlay').style.display = 'flex';
+}
+
+function hideLoading() {
+    document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// Add enter key support for address input
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('property-address').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            lookupProperty();
+        }
+    });
+});
+</script>
+{% endblock %}

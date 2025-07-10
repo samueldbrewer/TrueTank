@@ -597,7 +597,12 @@
                 </div>
                 <div class="form-group">
                     <label for="modal_tank_size">Tank Size (gallons) *</label>
-                    <input type="number" id="modal_tank_size" name="tank_size" required>
+                    <div class="input-with-ai">
+                        <input type="number" id="modal_tank_size" name="tank_size" required>
+                        <button type="button" class="ai-estimate-btn" onclick="openTicketAIEstimateModal()">
+                            🤖 AI Estimate
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -628,6 +633,258 @@
         </div>
     </div>
 </div>
+
+<!-- AI Estimate Modal for Ticket -->
+<div id="ticket-ai-estimate-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🤖 AI Septic System Estimate</h3>
+            <span class="close" onclick="closeTicketAIEstimateModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Get an AI-powered septic system estimate based on property details:</p>
+            
+            <!-- Customer Address Display -->
+            <div id="ticket-customer-address-display" class="customer-address-display" style="display: none;">
+                <div class="address-label">Property Address:</div>
+                <div id="ticket-customer-address-text" class="address-text"></div>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ticket-ai-bedrooms">Number of Bedrooms *</label>
+                <select id="ticket-ai-bedrooms" required>
+                    <option value="">Select...</option>
+                    <option value="1">1 Bedroom</option>
+                    <option value="2">2 Bedrooms</option>
+                    <option value="3">3 Bedrooms</option>
+                    <option value="4">4 Bedrooms</option>
+                    <option value="5">5 Bedrooms</option>
+                    <option value="6">6+ Bedrooms</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ticket-ai-bathrooms">Number of Bathrooms</label>
+                <select id="ticket-ai-bathrooms">
+                    <option value="">Select...</option>
+                    <option value="1">1 Bathroom</option>
+                    <option value="1.5">1.5 Bathrooms</option>
+                    <option value="2">2 Bathrooms</option>
+                    <option value="2.5">2.5 Bathrooms</option>
+                    <option value="3">3 Bathrooms</option>
+                    <option value="3.5">3.5 Bathrooms</option>
+                    <option value="4">4+ Bathrooms</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ticket-ai-occupants">Expected Occupants</label>
+                <select id="ticket-ai-occupants">
+                    <option value="">Select...</option>
+                    <option value="1">1 Person</option>
+                    <option value="2">2 People</option>
+                    <option value="3">3 People</option>
+                    <option value="4">4 People</option>
+                    <option value="5">5 People</option>
+                    <option value="6">6+ People</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ticket-ai-property-type">Property Type</label>
+                <select id="ticket-ai-property-type">
+                    <option value="single_family">Single Family Home</option>
+                    <option value="townhouse">Townhouse</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="manufactured">Manufactured Home</option>
+                </select>
+            </div>
+            
+            <div class="ai-form-group">
+                <label for="ticket-ai-soil-type">Soil Conditions</label>
+                <select id="ticket-ai-soil-type">
+                    <option value="normal">Normal/Unknown</option>
+                    <option value="clay">Clay Soil</option>
+                    <option value="sandy">Sandy Soil</option>
+                    <option value="rocky">Rocky Soil</option>
+                    <option value="high_water_table">High Water Table</option>
+                </select>
+            </div>
+            
+            <div id="ticket-ai-estimate-result" class="ai-estimate-result" style="display: none;">
+                <div class="estimate-card">
+                    <h4>🎯 AI Recommendation</h4>
+                    <div class="estimate-details">
+                        <div class="estimate-item">
+                            <span class="label">Tank Size:</span>
+                            <span class="value" id="ticket-ai-tank-size">-</span>
+                        </div>
+                        <div class="estimate-item">
+                            <span class="label">System Type:</span>
+                            <span class="value" id="ticket-ai-system-type">-</span>
+                        </div>
+                        <div class="estimate-item">
+                            <span class="label">Material:</span>
+                            <span class="value" id="ticket-ai-material">-</span>
+                        </div>
+                        <div class="estimate-item">
+                            <span class="label">Compartments:</span>
+                            <span class="value" id="ticket-ai-compartments">-</span>
+                        </div>
+                    </div>
+                    <div class="ai-notes" id="ticket-ai-notes"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeTicketAIEstimateModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="generateTicketAIEstimate()" id="ticket-generate-btn">
+                Generate Estimate
+            </button>
+            <button class="btn btn-success" onclick="applyTicketAIEstimate()" id="ticket-apply-btn" style="display: none;">
+                Apply to Form
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* AI Estimate Button for ticket form */
+.input-with-ai {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.input-with-ai input {
+    flex: 1;
+}
+
+.ai-estimate-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+}
+
+.ai-estimate-btn:hover {
+    background: linear-gradient(135deg, #5855eb, #7c3aed);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+}
+
+/* Customer Address Display */
+.customer-address-display {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.address-label {
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.address-text {
+    color: #1e293b;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+.ai-form-group {
+    margin-bottom: 1rem;
+}
+
+.ai-form-group label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.ai-form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.ai-form-group select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.ai-estimate-result {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.estimate-card h4 {
+    margin: 0 0 1rem 0;
+    color: #1e293b;
+}
+
+.estimate-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.estimate-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+.estimate-item .label {
+    font-weight: 500;
+    color: #64748b;
+}
+
+.estimate-item .value {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.ai-notes {
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    color: #92400e;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -874,6 +1131,198 @@ window.onclick = function(event) {
 document.getElementById('customer_id').addEventListener('change', function() {
     const newSystemBtn = document.getElementById('new-system-btn');
     newSystemBtn.disabled = !this.value;
+});
+
+// AI Estimation Functions for Ticket Form
+let currentTicketAIEstimate = null;
+
+function openTicketAIEstimateModal() {
+    // Get customer address if available
+    const customerSelect = document.getElementById('customer_id');
+    const selectedCustomerId = customerSelect.value;
+    
+    if (selectedCustomerId) {
+        // Show loading state
+        document.getElementById('ticket-ai-estimate-modal').style.display = 'block';
+        document.getElementById('ticket-generate-btn').disabled = true;
+        document.getElementById('ticket-generate-btn').textContent = 'Loading customer info...';
+        
+        // Fetch customer details including address
+        fetch(`/api/customers/${selectedCustomerId}`)
+        .then(response => response.json())
+        .then(customer => {
+            // Store customer info for later use
+            window.ticketCurrentCustomer = customer;
+            
+            // Display customer address
+            const addressDisplay = document.getElementById('ticket-customer-address-display');
+            const addressText = document.getElementById('ticket-customer-address-text');
+            if (customer.street_address) {
+                addressText.textContent = `${customer.street_address}, ${customer.city}, ${customer.state} ${customer.zip_code}`;
+                addressDisplay.style.display = 'block';
+            } else {
+                addressDisplay.style.display = 'none';
+            }
+            
+            // Pre-fill some reasonable defaults
+            document.getElementById('ticket-ai-bedrooms').value = '3';
+            document.getElementById('ticket-ai-bathrooms').value = '2';
+            document.getElementById('ticket-ai-occupants').value = '4';
+            document.getElementById('ticket-ai-property-type').value = 'single_family';
+            document.getElementById('ticket-ai-soil-type').value = 'normal';
+            
+            // Reset modal state
+            document.getElementById('ticket-ai-estimate-result').style.display = 'none';
+            document.getElementById('ticket-generate-btn').style.display = 'inline-block';
+            document.getElementById('ticket-apply-btn').style.display = 'none';
+            document.getElementById('ticket-generate-btn').disabled = false;
+            document.getElementById('ticket-generate-btn').textContent = 'Generate Estimate';
+        })
+        .catch(error => {
+            console.error('Error loading customer:', error);
+            alert('Could not load customer information');
+            closeTicketAIEstimateModal();
+        });
+    } else {
+        alert('Please select a customer first');
+        return;
+    }
+}
+
+function closeTicketAIEstimateModal() {
+    document.getElementById('ticket-ai-estimate-modal').style.display = 'none';
+}
+
+function generateTicketAIEstimate() {
+    const bedrooms = document.getElementById('ticket-ai-bedrooms').value;
+    const bathrooms = document.getElementById('ticket-ai-bathrooms').value;
+    const occupants = document.getElementById('ticket-ai-occupants').value;
+    const propertyType = document.getElementById('ticket-ai-property-type').value;
+    const soilType = document.getElementById('ticket-ai-soil-type').value;
+    
+    if (!bedrooms) {
+        alert('Please select number of bedrooms');
+        return;
+    }
+    
+    // Show loading state
+    const generateBtn = document.getElementById('ticket-generate-btn');
+    generateBtn.disabled = true;
+    generateBtn.textContent = '🤖 Generating...';
+    
+    // Prepare data for AI API - include customer address if available
+    let customerAddress = 'Property Address Not Available';
+    if (window.ticketCurrentCustomer) {
+        const customer = window.ticketCurrentCustomer;
+        customerAddress = `${customer.street_address}, ${customer.city}, ${customer.state} ${customer.zip_code}`;
+    }
+    
+    const propertyData = {
+        address: customerAddress,
+        customer_type: window.ticketCurrentCustomer?.customer_type || 'residential',
+        bedrooms: parseInt(bedrooms),
+        bathrooms: parseFloat(bathrooms) || 2,
+        occupants: parseInt(occupants) || parseInt(bedrooms) + 1,
+        property_type: propertyType,
+        soil_type: soilType,
+        water_table: soilType === 'high_water_table' ? 'high' : 'normal',
+        property_size: propertyType === 'commercial' ? 2.0 : 1.0,
+        year_built: 2000
+    };
+    
+    // Call AI estimate API
+    fetch('/api/ai-estimate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ property_data: propertyData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Estimate';
+        
+        if (data.error) {
+            alert('Error generating estimate: ' + data.error);
+            return;
+        }
+        
+        // Store the estimate
+        currentTicketAIEstimate = data;
+        
+        // Display results
+        displayTicketAIEstimate(data);
+        
+        // Show apply button
+        document.getElementById('ticket-generate-btn').style.display = 'none';
+        document.getElementById('ticket-apply-btn').style.display = 'inline-block';
+        document.getElementById('ticket-ai-estimate-result').style.display = 'block';
+    })
+    .catch(error => {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate Estimate';
+        console.error('Error:', error);
+        alert('Failed to generate estimate. Please try again.');
+    });
+}
+
+function displayTicketAIEstimate(data) {
+    document.getElementById('ticket-ai-tank-size').textContent = data.tank_size + ' gallons';
+    document.getElementById('ticket-ai-system-type').textContent = (data.system_type || 'conventional').replace('_', ' ').toUpperCase();
+    document.getElementById('ticket-ai-material').textContent = (data.tank_material || 'concrete').toUpperCase();
+    document.getElementById('ticket-ai-compartments').textContent = data.num_compartments || '2';
+    
+    // Show installation notes
+    const notes = data.installation_notes || 'Standard residential installation recommended.';
+    document.getElementById('ticket-ai-notes').textContent = '💡 ' + notes;
+}
+
+function applyTicketAIEstimate() {
+    if (!currentTicketAIEstimate) {
+        alert('No estimate available');
+        return;
+    }
+    
+    // Apply to modal form fields
+    if (currentTicketAIEstimate.tank_size) {
+        document.getElementById('modal_tank_size').value = currentTicketAIEstimate.tank_size;
+    }
+    
+    if (currentTicketAIEstimate.system_type) {
+        document.getElementById('modal_system_type').value = currentTicketAIEstimate.system_type;
+    }
+    
+    if (currentTicketAIEstimate.tank_material) {
+        document.getElementById('modal_tank_material').value = currentTicketAIEstimate.tank_material;
+    }
+    
+    if (currentTicketAIEstimate.num_compartments) {
+        document.getElementById('modal_num_compartments').value = currentTicketAIEstimate.num_compartments;
+    }
+    
+    // Add AI notes to access notes if not already filled
+    if (currentTicketAIEstimate.installation_notes) {
+        const accessNotes = document.getElementById('modal_access_notes');
+        if (!accessNotes.value) {
+            accessNotes.value = `AI Notes: ${currentTicketAIEstimate.installation_notes}`;
+        }
+    }
+    
+    // Close modal
+    closeTicketAIEstimateModal();
+    
+    // Scroll to tank size field
+    document.getElementById('modal_tank_size').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    alert('AI estimate applied to septic system form!');
+}
+
+// Close AI modal when clicking outside
+document.addEventListener('click', function(event) {
+    const aiModal = document.getElementById('ticket-ai-estimate-modal');
+    if (event.target === aiModal) {
+        closeTicketAIEstimateModal();
+    }
 });
 </script>
 {% endblock %}
