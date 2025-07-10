@@ -2,6 +2,12 @@
 
 {% block title %}Job Board - TrueTank{% endblock %}
 
+{% block head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+{% endblock %}
+
 {% block content %}
 <div class="job-board-container">
     <div class="board-header">
@@ -76,6 +82,31 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeTeamModal()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveTeamAssignment()">Assign</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Truck Route Map Modal -->
+    <div id="truck-map-modal" class="modal" style="display: none;">
+        <div class="modal-content map-modal-content">
+            <div class="modal-header">
+                <h3>🗺️ Route Map - <span id="map-truck-name"></span></h3>
+                <span class="close" onclick="closeTruckMapModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="map-container">
+                    <div id="truck-map" style="height: 500px; width: 100%;"></div>
+                </div>
+                <div id="route-summary" class="route-summary">
+                    <h4>📍 Route Summary for <span id="summary-date"></span></h4>
+                    <div id="route-jobs-list" class="route-jobs-list">
+                        <!-- Jobs will be populated here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeTruckMapModal()">Close</button>
+                <button class="btn btn-success" onclick="exportRoute()">📤 Export Directions</button>
             </div>
         </div>
     </div>
@@ -231,22 +262,58 @@
     color: white;
     padding: 1rem;
     border-radius: 8px 8px 0 0;
-    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.truck-header:hover {
-    background: #2c3e50;
-}
-
-.truck-header h4 {
+.truck-title-section h4 {
     margin: 0;
     font-size: 1.1rem;
 }
 
-.truck-header .truck-info {
+.truck-title-section .truck-info {
     font-size: 0.9rem;
     opacity: 0.8;
     margin-top: 0.25rem;
+}
+
+.truck-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.truck-action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.truck-action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+.map-btn {
+    background: rgba(52, 152, 219, 0.3);
+}
+
+.map-btn:hover {
+    background: rgba(52, 152, 219, 0.5);
+}
+
+.team-btn {
+    background: rgba(39, 174, 96, 0.3);
+}
+
+.team-btn:hover {
+    background: rgba(39, 174, 96, 0.5);
 }
 
 .team-assignment {
@@ -634,6 +701,107 @@
 }
 
 
+/* Map Modal Styles */
+.modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-modal-content {
+    width: 95%;
+    max-width: 1000px;
+    max-height: 90vh;
+    margin: 0;
+}
+
+.route-summary {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.route-summary h4 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.route-jobs-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.route-job-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    border-left: 3px solid #3498db;
+}
+
+.route-job-item.priority-urgent {
+    border-left-color: #e74c3c;
+}
+
+.route-job-item.priority-high {
+    border-left-color: #f39c12;
+}
+
+.route-job-item.priority-medium {
+    border-left-color: #3498db;
+}
+
+.route-job-item.priority-low {
+    border-left-color: #95a5a6;
+}
+
+.job-order {
+    background: #3498db;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+}
+
+.job-details {
+    flex: 1;
+}
+
+.job-time {
+    font-weight: bold;
+    color: #2c3e50;
+    margin-right: 0.5rem;
+}
+
+.job-service {
+    color: #34495e;
+    margin-right: 0.5rem;
+}
+
+.job-customer {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.job-address {
+    color: #95a5a6;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
 @media (max-width: 768px) {
     .truck-scheduler {
         grid-template-columns: 1fr;
@@ -653,8 +821,31 @@
     .board-actions {
         margin-left: 0;
     }
+    
+    .truck-actions {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .truck-action-btn {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.5rem;
+    }
+    
+    .map-modal-content {
+        width: 98%;
+        margin: 1rem auto;
+    }
+    
+    #truck-map {
+        height: 300px !important;
+    }
 }
 </style>
+
+<!-- Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <script>
 // Global variables
@@ -731,6 +922,18 @@ function loadJobBoard() {
             allPendingTickets = data.pending_tickets;
             currentSortBy = data.sort_by;
             
+            // Load persisted team assignments
+            teamAssignments = {};
+            if (data.team_assignments) {
+                Object.keys(data.team_assignments).forEach(truckId => {
+                    const assignment = data.team_assignments[truckId];
+                    teamAssignments[truckId] = {
+                        id: assignment.team_member_id,
+                        name: assignment.team_member_name
+                    };
+                });
+            }
+            
             // Update sort dropdown
             document.getElementById('sort-pending').value = currentSortBy;
             
@@ -738,6 +941,17 @@ function loadJobBoard() {
             filterAndDisplayPendingTickets();
             
             renderTruckColumns(data.trucks, data.truck_schedules);
+            
+            // If a truck map is currently open, refresh it with updated data
+            if (currentMapTruckId && document.getElementById('truck-map-modal').style.display === 'flex') {
+                console.log('Refreshing open map with updated data');
+                const truckInfo = trucks.find(t => t.id == currentMapTruckId);
+                const assignedTeamMember = teamAssignments[currentMapTruckId];
+                const truckTickets = data.truck_schedules[currentMapTruckId] || [];
+                
+                // Re-initialize the map with fresh data
+                initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets);
+            }
         })
         .catch(error => {
             console.error('Error loading job board:', error);
@@ -863,9 +1077,19 @@ function createTruckColumn(truck, tickets) {
         'Click to assign team member';
     
     column.innerHTML = `
-        <div class="truck-header" onclick="openTeamModal(${truck.id}, '${truck.truck_number}')">
-            <h4>${truck.truck_number}</h4>
-            <div class="truck-info">${truck.make} ${truck.model}</div>
+        <div class="truck-header">
+            <div class="truck-title-section">
+                <h4>${truck.truck_number}</h4>
+                <div class="truck-info">${truck.make} ${truck.model}</div>
+            </div>
+            <div class="truck-actions">
+                <button class="truck-action-btn map-btn" onclick="openTruckMap(${truck.id}, '${truck.truck_number}')" title="View route map">
+                    🗺️ Map
+                </button>
+                <button class="truck-action-btn team-btn" onclick="openTeamModal(${truck.id}, '${truck.truck_number}')" title="Assign team member">
+                    👥 Team
+                </button>
+            </div>
         </div>
         <div class="team-assignment">${teamDisplay}</div>
         <div class="ticket-list" 
@@ -1156,6 +1380,15 @@ function openTeamModal(truckId, truckNumber) {
     currentTruckId = truckId;
     document.getElementById('modal-truck-name').textContent = truckNumber;
     document.getElementById('modal-date').textContent = new Date(currentDate).toLocaleDateString();
+    
+    // Pre-select current assignment
+    const teamSelect = document.getElementById('team-member-select');
+    if (teamAssignments[truckId]) {
+        teamSelect.value = teamAssignments[truckId].id;
+    } else {
+        teamSelect.value = '';
+    }
+    
     document.getElementById('team-assignment-modal').style.display = 'block';
 }
 
@@ -1169,24 +1402,50 @@ function saveTeamAssignment() {
     const memberName = document.getElementById('team-member-select').selectedOptions[0].text;
     
     if (currentTruckId) {
-        if (memberId) {
-            teamAssignments[currentTruckId] = {
-                id: memberId,
-                name: memberName
-            };
-        } else {
-            delete teamAssignments[currentTruckId];
-        }
+        // Save to database
+        const assignmentData = {
+            truck_id: currentTruckId,
+            team_member_id: memberId || null,
+            assignment_date: currentDate
+        };
         
-        // Update the display
-        const truckColumn = document.querySelector(`[data-truck-id="${currentTruckId}"]`);
-        const teamDisplay = teamAssignments[currentTruckId] ? 
-            `Assigned: ${teamAssignments[currentTruckId].name}` : 
-            'Click to assign team member';
-        truckColumn.querySelector('.team-assignment').textContent = teamDisplay;
+        fetch('/api/team-assignments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(assignmentData)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Update local cache
+                if (memberId) {
+                    teamAssignments[currentTruckId] = {
+                        id: memberId,
+                        name: memberName
+                    };
+                } else {
+                    delete teamAssignments[currentTruckId];
+                }
+                
+                // Update the display
+                const truckColumn = document.querySelector(`[data-truck-id="${currentTruckId}"]`);
+                const teamDisplay = teamAssignments[currentTruckId] ? 
+                    `Assigned: ${teamAssignments[currentTruckId].name}` : 
+                    'Click to assign team member';
+                truckColumn.querySelector('.team-assignment').textContent = teamDisplay;
+                
+                closeTeamModal();
+            } else {
+                alert('Error saving team assignment: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to save team assignment');
+        });
     }
-    
-    closeTeamModal();
 }
 
 // Click vs Drag Detection Functions
@@ -1225,12 +1484,367 @@ function handleCardClick(e) {
     window.location.href = `/ticket/${ticketId}`;
 }
 
+// Truck Map Functions
+let currentMapTruckId = null;
+let truckMap = null;
+let mapMarkers = [];
+
+function openTruckMap(truckId, truckNumber) {
+    console.log('Opening truck map for:', truckNumber, 'ID:', truckId);
+    currentMapTruckId = truckId;
+    
+    // Update modal title and date
+    document.getElementById('map-truck-name').textContent = truckNumber;
+    document.getElementById('summary-date').textContent = currentDate;
+    
+    // Show modal
+    document.getElementById('truck-map-modal').style.display = 'flex';
+    
+    // Initialize map with longer delay to ensure modal is visible
+    setTimeout(() => {
+        console.log('Initializing map...');
+        try {
+            initializeTruckMap(truckId);
+        } catch (error) {
+            console.error('Error initializing map:', error);
+            document.getElementById('truck-map').innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #e74c3c;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 1rem;">⚠️</div>
+                        <div>Error loading map: ${error.message}</div>
+                    </div>
+                </div>
+            `;
+        }
+    }, 300);
+}
+
+function closeTruckMapModal() {
+    document.getElementById('truck-map-modal').style.display = 'none';
+    currentMapTruckId = null;
+    
+    // Clear and remove map
+    if (truckMap) {
+        truckMap.remove();
+        truckMap = null;
+        mapMarkers = [];
+    }
+}
+
+function initializeTruckMap(truckId) {
+    console.log('Initializing truck map for truck ID:', truckId);
+    console.log('Available trucks:', trucks);
+    console.log('Team assignments:', teamAssignments);
+    
+    // Get truck info from global trucks array
+    const truckInfo = trucks.find(t => t.id == truckId);
+    const assignedTeamMember = teamAssignments[truckId];
+    
+    // Fetch the detailed ticket data for this truck from the API
+    fetch(`/api/job-board?date=${currentDate}`)
+        .then(response => response.json())
+        .then(data => {
+            const truckTickets = data.truck_schedules[truckId] || [];
+            console.log('Fetched truck tickets:', truckTickets);
+            
+            // Continue with map initialization
+            initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets);
+        })
+        .catch(error => {
+            console.error('Error fetching ticket data:', error);
+            // Fallback to simpler map
+            initializeMapWithTickets(truckInfo, assignedTeamMember, []);
+        });
+}
+
+function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
+    
+    console.log('Truck tickets from database:', truckTickets.length);
+    console.log('Truck info:', truckInfo);
+    console.log('Assigned team member:', assignedTeamMember);
+    
+    // Use tickets from database (already sorted by route_position in the API)
+    // The API endpoint sorts by route_position which is updated by drag & drop
+    const orderedTickets = truckTickets;
+    
+    console.log('Using database order - tickets are already sorted by route_position:', orderedTickets);
+    
+    // Clear the map container
+    const mapContainer = document.getElementById('truck-map');
+    if (!mapContainer) {
+        throw new Error('Map container not found');
+    }
+    mapContainer.innerHTML = '';
+    
+    // Check if Leaflet is available
+    if (typeof L === 'undefined') {
+        throw new Error('Leaflet library not loaded');
+    }
+    
+    console.log('Creating Leaflet map...');
+    // Initialize Leaflet map centered on Pewee Valley, KY
+    truckMap = L.map('truck-map').setView([38.3148, -85.4569], 11);
+    
+    // Add satellite imagery tiles using Esri World Imagery
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    }).addTo(truckMap);
+    
+    // Clear existing markers
+    mapMarkers.forEach(marker => marker.remove());
+    mapMarkers = [];
+    
+    // Array to track all points for map bounds
+    const allPoints = [];
+    
+    // 1. Add TrueTank Office marker
+    const officeCoords = [38.3148, -85.4569];
+    const officeMarker = L.marker(officeCoords, {
+        icon: L.divIcon({
+            className: 'office-marker',
+            html: '<div style="background: #27ae60; color: white; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 16px;">🏢</div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        })
+    }).addTo(truckMap);
+    
+    officeMarker.bindPopup('<b>🏢 TrueTank Main Office</b><br>123 Main Street<br>Pewee Valley, KY 40056<br><i>Depot & Headquarters</i>');
+    mapMarkers.push(officeMarker);
+    allPoints.push(officeCoords);
+    
+    // 2. Add team member home location (if assigned)
+    if (assignedTeamMember) {
+        const teamMemberCoords = getTeamMemberHomeCoords(assignedTeamMember.name);
+        const teamMarker = L.marker(teamMemberCoords, {
+            icon: L.divIcon({
+                className: 'team-marker',
+                html: '<div style="background: #9b59b6; color: white; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 14px;">👤</div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            })
+        }).addTo(truckMap);
+        
+        teamMarker.bindPopup(`<b>👤 ${assignedTeamMember.name}</b><br>Team Member Home<br><i>Assigned to ${truckInfo.truck_number}</i>`);
+        mapMarkers.push(teamMarker);
+        allPoints.push(teamMemberCoords);
+    }
+    
+    // 3. Add current truck location (simulated - parked at equipment storage)
+    const truckCoords = [38.3125, -85.4580]; // Equipment storage location
+    const truckMarker = L.marker(truckCoords, {
+        icon: L.divIcon({
+            className: 'truck-marker',
+            html: `<div style="background: #3498db; color: white; border-radius: 8px; width: 36px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 16px;">🚛</div>`,
+            iconSize: [36, 30],
+            iconAnchor: [18, 15]
+        })
+    }).addTo(truckMap);
+    
+    truckMarker.bindPopup(`<b>🚛 ${truckInfo.truck_number}</b><br>${truckInfo.make} ${truckInfo.model}<br>Equipment Storage<br><i>Current truck location</i>`);
+    mapMarkers.push(truckMarker);
+    allPoints.push(truckCoords);
+    
+    // 4. Add job locations for tickets in this truck (numbered by their route_position order from database)
+    if (orderedTickets.length > 0) {
+        orderedTickets.forEach((ticket, index) => {
+            // Use the actual customer address to generate coordinates
+            const coords = generateCoordinatesForAddress(ticket.customer_address || '', index);
+            allPoints.push(coords);
+            
+            // Get priority color for the marker
+            const priorityColor = getPriorityColor(ticket.priority);
+            
+            // Create job marker numbered by position in truck column
+            const jobMarker = L.marker(coords, {
+                icon: L.divIcon({
+                    className: 'job-marker',
+                    html: `<div style="background: ${priorityColor}; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 14px;">${index + 1}</div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                })
+            }).addTo(truckMap);
+            
+            // Create detailed popup content
+            const scheduledTime = ticket.scheduled_date ? 
+                new Date(ticket.scheduled_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+                'Time TBD';
+            
+            const popupContent = `
+                <div style="min-width: 220px;">
+                    <b>📍 Job ${index + 1}: ${scheduledTime}</b><br>
+                    <strong>${ticket.job_id}</strong><br>
+                    <div style="margin: 8px 0;">
+                        <strong>${ticket.service_type}</strong><br>
+                        Customer: ${ticket.customer_name || 'Unknown'}<br>
+                        Priority: <span style="color: ${priorityColor}; font-weight: bold;">${(ticket.priority || 'medium').toUpperCase()}</span>
+                    </div>
+                    <div style="font-size: 0.9em; color: #666;">
+                        ${ticket.customer_address || 'Address not available'}<br>
+                        Duration: ${ticket.estimated_duration || 'TBD'} min
+                    </div>
+                </div>
+            `;
+            
+            jobMarker.bindPopup(popupContent);
+            mapMarkers.push(jobMarker);
+        });
+        
+        // Create route summary with the ordered tickets
+        createRouteSummary(orderedTickets);
+    } else {
+        document.getElementById('route-jobs-list').innerHTML = '<p>No jobs scheduled for this truck today.</p>';
+    }
+    
+    // Fit map to show all points
+    if (allPoints.length > 0) {
+        const group = new L.featureGroup(mapMarkers.filter(marker => marker.getLatLng));
+        truckMap.fitBounds(group.getBounds().pad(0.1));
+    }
+}
+
+function getTeamMemberHomeCoords(memberName) {
+    // Simulate team member home locations around the area
+    const teamHomes = {
+        'James Wilson': [38.3148, -85.4469],      // Pewee Valley
+        'Maria Garcia': [38.2542, -85.7285],      // Louisville  
+        'Robert Smith': [38.4048, -85.3716],      // LaGrange
+        'Ashley Johnson': [38.3414, -85.4694]     // Crestwood
+    };
+    
+    return teamHomes[memberName] || [38.3148, -85.4569]; // Default to office
+}
+
+function generateCoordinatesForAddress(address, index) {
+    // Generate realistic coordinates around Pewee Valley, KY area
+    // This simulates geocoding - in production you'd use a real geocoding service
+    
+    const baseCoords = {
+        'Pewee Valley': [38.3148, -85.4569],
+        'Louisville': [38.2542, -85.7585],
+        'LaGrange': [38.4048, -85.3816],
+        'Crestwood': [38.3414, -85.4794],
+        'Buckner': [38.3503, -85.4630],
+        'Prospect': [38.3542, -85.5996],
+        'Goshen': [38.4014, -85.5691],
+        'Ballardsville': [38.3592, -85.5691]
+    };
+    
+    // Find city in address
+    let coords = [38.3148, -85.4569]; // Default to Pewee Valley
+    
+    if (address) {
+        for (const [city, cityCoords] of Object.entries(baseCoords)) {
+            if (address.includes(city)) {
+                coords = [...cityCoords];
+                break;
+            }
+        }
+    }
+    
+    // Add some random offset to simulate different addresses in the same city
+    const offset = 0.02; // About 1-2 miles
+    coords[0] += (Math.random() - 0.5) * offset;
+    coords[1] += (Math.random() - 0.5) * offset;
+    
+    return coords;
+}
+
+function getPriorityColor(priority) {
+    switch (priority) {
+        case 'urgent': return '#e74c3c';
+        case 'high': return '#f39c12';
+        case 'medium': return '#3498db';
+        case 'low': return '#95a5a6';
+        default: return '#3498db';
+    }
+}
+
+function createRouteSummary(tickets) {
+    const routeJobsList = document.getElementById('route-jobs-list');
+    
+    if (tickets.length === 0) {
+        routeJobsList.innerHTML = '<p>No jobs scheduled for this date.</p>';
+        return;
+    }
+    
+    routeJobsList.innerHTML = tickets.map((ticket, index) => {
+        const scheduledTime = ticket.scheduled_date ? 
+            new Date(ticket.scheduled_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+            'Time TBD';
+            
+        return `
+            <div class="route-job-item priority-${ticket.priority || 'medium'}">
+                <div class="job-order">${index + 1}</div>
+                <div class="job-details">
+                    <div>
+                        <span class="job-time">${scheduledTime}</span>
+                        <span class="job-service">${ticket.service_type || 'Service'}</span>
+                        <span class="job-customer">${ticket.customer_name || ticket.job_id}</span>
+                    </div>
+                    <div class="job-address">${ticket.customer_address || 'Address not available'}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+
+function exportRoute() {
+    if (!currentMapTruckId) return;
+    
+    const truckName = document.getElementById('map-truck-name').textContent;
+    
+    // Fetch the detailed ticket data for export
+    fetch(`/api/job-board?date=${currentDate}`)
+        .then(response => response.json())
+        .then(data => {
+            const truckTickets = data.truck_schedules[currentMapTruckId] || [];
+            
+            if (truckTickets.length === 0) {
+                alert('No jobs to export');
+                return;
+            }
+            
+            // Tickets are already sorted by route_position from the API
+            // Create detailed export data
+            const routeData = truckTickets.map((ticket, index) => {
+                const time = ticket.scheduled_date ? 
+                    new Date(ticket.scheduled_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
+                    'Time TBD';
+                return `${index + 1}. ${time} - ${ticket.service_type}\\n   Customer: ${ticket.customer_name || 'Unknown'}\\n   Address: ${ticket.customer_address || 'Address not available'}\\n   Job ID: ${ticket.job_id}\\n   Priority: ${(ticket.priority || 'medium').toUpperCase()}`;
+            }).join('\\n\\n');
+            
+            const exportContent = `TrueTank Route Directions\\n${truckName}\\nDate: ${currentDate}\\n\\n${routeData}`;
+            
+            // Create and download file
+            const blob = new Blob([exportContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${truckName}_Route_${currentDate.replace(/-/g, '')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            alert('Route directions exported successfully!');
+        })
+        .catch(error => {
+            console.error('Error fetching data for export:', error);
+            alert('Failed to export route - please try again');
+        });
+}
+
 // Close modal when clicking outside
 window.onclick = function(event) {
     const teamModal = document.getElementById('team-assignment-modal');
+    const mapModal = document.getElementById('truck-map-modal');
     
     if (event.target === teamModal) {
         closeTeamModal();
+    }
+    if (event.target === mapModal) {
+        closeTruckMapModal();
     }
 }
 </script>

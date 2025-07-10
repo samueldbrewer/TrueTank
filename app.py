@@ -1,8 +1,16 @@
 import os
 from flask import Flask, render_template, request, jsonify
-from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember
+from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember, TruckTeamAssignment
 from dotenv import load_dotenv
 from datetime import datetime
+
+# Import OpenAI at the top level
+try:
+    from openai import OpenAI
+    openai_available = True
+except ImportError:
+    openai_available = False
+    print("Warning: OpenAI module not available")
 
 # Load environment variables from .env file
 load_dotenv()
@@ -113,6 +121,11 @@ def team_manager():
     team_members = TeamMember.query.all()
     return render_template('team_manager.html', team_members=team_members)
 
+# AI Septic Estimator Test Route
+@app.route('/ai-estimator')
+def ai_estimator():
+    return render_template('ai_estimator.html')
+
 @app.route('/team-member/create')
 def create_team_member():
     return render_template('team_member_form.html')
@@ -182,11 +195,23 @@ def get_job_board_data():
         truck_tickets.sort(key=lambda x: x.route_position or 999)  # Sort by route position
         truck_schedules[str(truck.id)] = [ticket.to_dict() for ticket in truck_tickets]
     
+    # Get team assignments for the target date
+    team_assignments = TruckTeamAssignment.query.filter_by(assignment_date=target_date).all()
+    team_assignments_dict = {}
+    for assignment in team_assignments:
+        if assignment.team_member:  # Only include if there's actually a team member assigned
+            team_assignments_dict[str(assignment.truck_id)] = {
+                'team_member_id': assignment.team_member_id,
+                'team_member_name': f"{assignment.team_member.first_name} {assignment.team_member.last_name}",
+                'position': assignment.team_member.position
+            }
+    
     return jsonify({
         'date': target_date.isoformat(),
         'pending_tickets': [ticket.to_dict() for ticket in pending_tickets],
         'truck_schedules': truck_schedules,
         'trucks': [{'id': t.id, 'truck_number': t.truck_number, 'make': t.make, 'model': t.model} for t in trucks],
+        'team_assignments': team_assignments_dict,
         'sort_by': sort_by
     })
 
@@ -588,6 +613,14 @@ def create_customer_api():
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/customers/<int:customer_id>', methods=['GET'])
+def get_customer_api(customer_id):
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        return jsonify(customer.to_dict())
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/customers/<int:customer_id>', methods=['PUT'])
@@ -1023,6 +1056,121 @@ def create_truck_api():
         db.session.commit()
         
         return jsonify(truck.to_dict()), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trucks/<int:truck_id>', methods=['PUT'])
+def update_truck_api(truck_id):
+    try:
+        truck = Truck.query.get_or_404(truck_id)
+        data = request.get_json()
+        
+        def safe_int(value):
+            try:
+                return int(value) if value and value != '' else None
+            except (ValueError, TypeError):
+                return None
+                
+        def safe_float(value):
+            try:
+                return float(value) if value and value != '' else None
+            except (ValueError, TypeError):
+                return None
+                
+        def safe_bool(value):
+            return value in [True, 'true', 'True', '1', 1]
+        
+        # Parse dates
+        purchase_date = None
+        if data.get('purchase_date'):
+            try:
+                from datetime import datetime
+                purchase_date = datetime.fromisoformat(data.get('purchase_date')).date()
+            except ValueError:
+                pass
+        
+        last_maintenance = None
+        if data.get('last_maintenance'):
+            try:
+                from datetime import datetime
+                last_maintenance = datetime.fromisoformat(data.get('last_maintenance')).date()
+            except ValueError:
+                pass
+                
+        next_maintenance_due = None
+        if data.get('next_maintenance_due'):
+            try:
+                from datetime import datetime
+                next_maintenance_due = datetime.fromisoformat(data.get('next_maintenance_due')).date()
+            except ValueError:
+                pass
+        
+        insurance_expiry = None
+        if data.get('insurance_expiry'):
+            try:
+                from datetime import datetime
+                insurance_expiry = datetime.fromisoformat(data.get('insurance_expiry')).date()
+            except ValueError:
+                pass
+                
+        registration_expiry = None
+        if data.get('registration_expiry'):
+            try:
+                from datetime import datetime
+                registration_expiry = datetime.fromisoformat(data.get('registration_expiry')).date()
+            except ValueError:
+                pass
+        
+        # Update truck fields
+        truck.truck_number = data.get('truck_number', truck.truck_number)
+        truck.license_plate = data.get('license_plate', truck.license_plate)
+        truck.vin = data.get('vin', truck.vin)
+        truck.make = data.get('make', truck.make)
+        truck.model = data.get('model', truck.model)
+        truck.year = safe_int(data.get('year')) or truck.year
+        truck.color = data.get('color', truck.color)
+        truck.tank_capacity = safe_int(data.get('tank_capacity')) or truck.tank_capacity
+        truck.tank_material = data.get('tank_material', truck.tank_material)
+        truck.num_compartments = safe_int(data.get('num_compartments')) or truck.num_compartments
+        truck.pump_type = data.get('pump_type', truck.pump_type)
+        truck.pump_cfm = safe_int(data.get('pump_cfm')) or truck.pump_cfm
+        truck.hose_length = safe_int(data.get('hose_length')) or truck.hose_length
+        truck.hose_diameter = safe_float(data.get('hose_diameter')) or truck.hose_diameter
+        truck.has_hose_reel = safe_bool(data.get('has_hose_reel')) if 'has_hose_reel' in data else truck.has_hose_reel
+        truck.has_pressure_washer = safe_bool(data.get('has_pressure_washer')) if 'has_pressure_washer' in data else truck.has_pressure_washer
+        truck.has_camera_system = safe_bool(data.get('has_camera_system')) if 'has_camera_system' in data else truck.has_camera_system
+        truck.has_gps_tracking = safe_bool(data.get('has_gps_tracking')) if 'has_gps_tracking' in data else truck.has_gps_tracking
+        truck.special_equipment = data.get('special_equipment', truck.special_equipment)
+        truck.status = data.get('status', truck.status)
+        truck.current_location_id = safe_int(data.get('current_location_id')) or truck.current_location_id
+        truck.current_mileage = safe_int(data.get('current_mileage')) or truck.current_mileage
+        truck.engine_hours = safe_float(data.get('engine_hours')) or truck.engine_hours
+        truck.purchase_date = purchase_date or truck.purchase_date
+        truck.last_maintenance = last_maintenance or truck.last_maintenance
+        truck.next_maintenance_due = next_maintenance_due or truck.next_maintenance_due
+        truck.maintenance_interval_miles = safe_int(data.get('maintenance_interval_miles')) or truck.maintenance_interval_miles
+        truck.maintenance_interval_hours = safe_int(data.get('maintenance_interval_hours')) or truck.maintenance_interval_hours
+        truck.insurance_company = data.get('insurance_company', truck.insurance_company)
+        truck.insurance_policy = data.get('insurance_policy', truck.insurance_policy)
+        truck.insurance_expiry = insurance_expiry or truck.insurance_expiry
+        truck.registration_expiry = registration_expiry or truck.registration_expiry
+        truck.dot_number = data.get('dot_number', truck.dot_number)
+        truck.purchase_price = safe_float(data.get('purchase_price')) or truck.purchase_price
+        truck.current_value = safe_float(data.get('current_value')) or truck.current_value
+        truck.notes = data.get('notes', truck.notes)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'id': truck.id,
+            'truck_number': truck.truck_number,
+            'make': truck.make,
+            'model': truck.model,
+            'year': truck.year,
+            'status': truck.status
+        })
         
     except Exception as e:
         db.session.rollback()
@@ -1640,6 +1788,367 @@ with app.app_context():
             db.session.add(ticket)
         
         db.session.commit()
+
+# AI Septic Estimator API
+@app.route('/api/property-lookup', methods=['POST'])
+def property_lookup():
+    """Look up property data using free APIs"""
+    try:
+        data = request.get_json()
+        address = data.get('address', '')
+        
+        if not address:
+            return jsonify({'error': 'Address is required'}), 400
+        
+        # Step 1: Geocode the address using free service
+        geocode_data = geocode_address(address)
+        if not geocode_data:
+            return jsonify({'error': 'Could not geocode address'}), 400
+        
+        # Step 2: Get census data for the area
+        census_data = get_census_data(geocode_data['lat'], geocode_data['lng'])
+        
+        # Step 3: Estimate property details using geocoding + census data
+        property_data = estimate_property_from_location(address, geocode_data, census_data)
+        
+        return jsonify(property_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def geocode_address(address):
+    """Geocode address using Nominatim (OpenStreetMap) - free service"""
+    try:
+        import requests
+        import urllib.parse
+        
+        # Nominatim is free and doesn't require API key
+        encoded_address = urllib.parse.quote(address)
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_address}&countrycodes=us&limit=1"
+        
+        headers = {
+            'User-Agent': 'TrueTank-SepticService/1.0'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            results = response.json()
+            if results:
+                result = results[0]
+                return {
+                    'lat': float(result['lat']),
+                    'lng': float(result['lon']),
+                    'display_name': result['display_name'],
+                    'address_type': result.get('type', 'unknown')
+                }
+        return None
+        
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+        return None
+
+def get_census_data(lat, lng):
+    """Get census data for coordinates using free Census API"""
+    try:
+        import requests
+        
+        # US Census Geocoding API - free, no key required
+        url = f"https://geocoding.geo.census.gov/geocoder/geographies/coordinates"
+        params = {
+            'x': lng,
+            'y': lat,
+            'benchmark': 'Public_AR_Current',
+            'vintage': 'Current_Current',
+            'format': 'json'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if 'result' in data and 'geographies' in data['result']:
+                geographies = data['result']['geographies']
+                
+                # Extract useful census data
+                census_info = {}
+                
+                # Get census tract info
+                if 'Census Tracts' in geographies:
+                    tract = geographies['Census Tracts'][0]
+                    census_info['tract'] = tract.get('TRACT', '')
+                    census_info['state'] = tract.get('STATE', '')
+                    census_info['county'] = tract.get('COUNTY', '')
+                
+                # Get place info (city/town)
+                if 'Incorporated Places' in geographies:
+                    place = geographies['Incorporated Places'][0]
+                    census_info['city'] = place.get('NAME', '')
+                    census_info['place_type'] = place.get('LSAD', '')
+                
+                return census_info
+                
+        return {}
+        
+    except Exception as e:
+        print(f"Census data error: {e}")
+        return {}
+
+def estimate_property_from_location(address, geocode_data, census_data):
+    """Estimate property characteristics from location data"""
+    import random
+    
+    # Parse address components
+    address_parts = address.split(',')
+    
+    # Estimate based on location characteristics
+    # Urban vs Rural estimation
+    display_name = geocode_data.get('display_name', '').lower()
+    is_urban = any(word in display_name for word in ['city', 'urban', 'downtown', 'metro'])
+    is_rural = any(word in display_name for word in ['rural', 'county', 'township', 'farm'])
+    
+    # Property size estimation
+    if is_urban:
+        property_size = round(random.uniform(0.15, 0.75), 2)  # Smaller urban lots
+    elif is_rural:
+        property_size = round(random.uniform(1.0, 5.0), 2)    # Larger rural lots
+    else:
+        property_size = round(random.uniform(0.25, 2.0), 2)   # Suburban
+    
+    # Bedroom estimation based on area type
+    if is_urban:
+        bedrooms = random.choice([1, 2, 2, 3, 3, 4])  # Smaller urban homes
+    elif is_rural:
+        bedrooms = random.choice([3, 3, 4, 4, 5, 6])  # Larger rural homes
+    else:
+        bedrooms = random.choice([2, 3, 3, 3, 4, 4])  # Suburban standard
+    
+    # Bathroom estimation
+    bathrooms = min(bedrooms, random.choice([1, 2, 2, 2.5, 3]))
+    if bedrooms >= 4:
+        bathrooms = random.choice([2, 2.5, 3, 3.5])
+    
+    # Year built estimation (newer in urban areas)
+    if is_urban:
+        year_built = random.randint(1980, 2020)
+    elif is_rural:
+        year_built = random.randint(1950, 2010)
+    else:
+        year_built = random.randint(1970, 2020)
+    
+    # Occupant estimation
+    occupants = min(bedrooms + random.choice([0, 1, 2]), 8)
+    
+    # Property type estimation
+    if is_urban:
+        property_type = random.choice(['single_family', 'townhouse', 'condo', 'multi_family'])
+    elif is_rural:
+        property_type = random.choice(['single_family', 'single_family', 'farmhouse', 'manufactured'])
+    else:
+        property_type = random.choice(['single_family', 'single_family', 'townhouse'])
+    
+    # Soil type estimation based on region
+    state = census_data.get('state', '')
+    if state in ['48']:  # Texas
+        soil_type = random.choice(['clay', 'clay_loam', 'sandy_clay'])
+    elif state in ['12']:  # Florida
+        soil_type = random.choice(['sandy', 'sandy_loam'])
+    elif state in ['17', '18', '19']:  # Midwest
+        soil_type = random.choice(['loam', 'clay_loam', 'silt_loam'])
+    else:
+        soil_type = random.choice(['clay', 'sandy', 'clay_loam', 'loam', 'sandy_loam'])
+    
+    # Water table estimation
+    if 'coastal' in display_name or 'beach' in display_name:
+        water_table = random.choice(['high', 'high', 'normal'])
+    elif 'hill' in display_name or 'mountain' in display_name:
+        water_table = random.choice(['low', 'normal'])
+    else:
+        water_table = random.choice(['normal', 'normal', 'high', 'low'])
+    
+    property_data = {
+        'address': address,
+        'property_size': property_size,
+        'bedrooms': bedrooms,
+        'bathrooms': bathrooms,
+        'year_built': year_built,
+        'occupants': occupants,
+        'property_type': property_type,
+        'soil_type': soil_type,
+        'water_table': water_table,
+        'lat': geocode_data['lat'],
+        'lng': geocode_data['lng'],
+        'city': census_data.get('city', 'Unknown'),
+        'county': census_data.get('county', 'Unknown'),
+        'state': census_data.get('state', 'Unknown'),
+        'data_source': 'geocoding_estimation'
+    }
+    
+    return property_data
+
+@app.route('/api/ai-estimate', methods=['POST'])
+def ai_estimate():
+    """Generate AI-powered septic system estimate"""
+    try:
+        # Check if OpenAI is available
+        if not openai_available:
+            return jsonify({'error': 'OpenAI service is not available'}), 503
+            
+        data = request.get_json()
+        property_data = data.get('property_data', {})
+        
+        # Create enhanced prompt with location-specific considerations
+        address = property_data.get('address', 'Unknown')
+        
+        # Extract state/region info for location-specific recommendations
+        location_guidance = ""
+        if 'TX' in address or 'Texas' in address:
+            location_guidance = "\nTexas-specific considerations: Clay soil common, high water table in coastal areas, minimum 1000-gallon requirement statewide."
+        elif 'FL' in address or 'Florida' in address:
+            location_guidance = "\nFlorida-specific considerations: Sandy soil common, high water table near coast, advanced treatment often required."
+        elif 'CA' in address or 'California' in address:
+            location_guidance = "\nCalifornia-specific considerations: Strict environmental regulations, advanced treatment systems often required."
+        
+        prompt = f"""As a septic system expert, estimate the specifications for a septic system based on these property details, location, and industry standards:
+
+Property Details:
+- Address: {address}
+- Property Size: {property_data.get('property_size', 'Unknown')} acres
+- Customer Type: {property_data.get('customer_type', 'residential')}
+- Bedrooms: {property_data.get('bedrooms', 3)}
+- Bathrooms: {property_data.get('bathrooms', 2)}
+- Year Built: {property_data.get('year_built', 'Unknown')}
+- Estimated Occupants: {property_data.get('occupants', 4)}
+- Property Type: {property_data.get('property_type', 'single_family')}
+- Soil Conditions: {property_data.get('soil_type', 'unknown')}
+- Water Table: {property_data.get('water_table', 'normal')}{location_guidance}
+
+Industry Rules of Thumb:
+1. Tank Size: 150 gallons per bedroom minimum, typically 1000-1500 gallons for residential
+2. For 3-bedroom home: minimum 1000 gallons
+3. For 4-bedroom home: minimum 1250 gallons
+4. For 5+ bedrooms: add 250 gallons per additional bedroom
+5. High water table or clay soil may require larger tank or advanced treatment
+6. Compartments: 1-2 for standard residential, 2-3 for larger systems
+7. Material: Concrete is standard, fiberglass/plastic for difficult access
+8. Commercial properties typically need 25-50% larger systems
+9. Consider local regulations and soil conditions for the specific address
+
+Based on the property address, local conditions, and industry standards, provide estimates for:
+1. Tank Size (gallons) - consider local requirements
+2. System Type (conventional, aerobic, advanced treatment, etc.)
+3. Tank Material (concrete, fiberglass, plastic)
+4. Number of Compartments
+5. Pump Frequency (months)
+6. Installation considerations specific to this location
+7. Estimated lifespan
+
+Format your response as JSON with these exact keys: tank_size, system_type, tank_material, num_compartments, pump_frequency_months, installation_notes, estimated_lifespan_years"""
+
+        # Call OpenAI API
+        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano-2025-04-1",
+            messages=[
+                {"role": "system", "content": "You are a septic system expert who provides accurate estimates based on property data and industry standards."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=500
+        )
+        
+        # Parse the AI response
+        import json
+        ai_response = response.choices[0].message.content
+        
+        # Try to extract JSON from the response
+        try:
+            # Find JSON content in the response
+            start = ai_response.find('{')
+            end = ai_response.rfind('}') + 1
+            if start >= 0 and end > start:
+                estimate_data = json.loads(ai_response[start:end])
+            else:
+                # Fallback if JSON not found
+                estimate_data = {
+                    'tank_size': 1000,
+                    'system_type': 'conventional',
+                    'tank_material': 'concrete',
+                    'num_compartments': 2,
+                    'pump_frequency_months': 36,
+                    'installation_notes': 'Standard residential installation',
+                    'estimated_lifespan_years': 20
+                }
+        except:
+            # Fallback estimate based on bedrooms
+            bedrooms = property_data.get('bedrooms', 3)
+            estimate_data = {
+                'tank_size': max(1000, bedrooms * 250),
+                'system_type': 'conventional',
+                'tank_material': 'concrete',
+                'num_compartments': 2,
+                'pump_frequency_months': 36,
+                'installation_notes': f'Standard {bedrooms}-bedroom residential system',
+                'estimated_lifespan_years': 20
+            }
+        
+        # Add property data to the response
+        estimate_data['property_data'] = property_data
+        estimate_data['ai_confidence'] = 'high' if 'bedrooms' in property_data else 'medium'
+        
+        return jsonify(estimate_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Team Assignment API
+@app.route('/api/team-assignments', methods=['POST'])
+def save_team_assignment():
+    """Save or update team assignment for a truck on a specific date"""
+    try:
+        data = request.get_json()
+        truck_id = data.get('truck_id')
+        team_member_id = data.get('team_member_id')  # Can be None to remove assignment
+        assignment_date_str = data.get('assignment_date')
+        
+        if not truck_id or not assignment_date_str:
+            return jsonify({'error': 'truck_id and assignment_date are required'}), 400
+        
+        # Parse date
+        try:
+            assignment_date = datetime.fromisoformat(assignment_date_str).date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format'}), 400
+        
+        # Check if assignment already exists
+        existing = TruckTeamAssignment.query.filter_by(
+            truck_id=truck_id,
+            assignment_date=assignment_date
+        ).first()
+        
+        if existing:
+            if team_member_id:
+                # Update existing assignment
+                existing.team_member_id = team_member_id
+                existing.updated_at = datetime.utcnow()
+            else:
+                # Remove assignment
+                db.session.delete(existing)
+        else:
+            if team_member_id:
+                # Create new assignment
+                assignment = TruckTeamAssignment(
+                    truck_id=truck_id,
+                    team_member_id=team_member_id,
+                    assignment_date=assignment_date
+                )
+                db.session.add(assignment)
+        
+        db.session.commit()
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5555))

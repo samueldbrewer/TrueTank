@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TrueTank - Septic Service Management{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
 </head>
 <body>
     <header>
@@ -22,6 +23,7 @@
                 <a href="{{ url_for('fleet_manager') }}">Fleet</a>
                 <a href="{{ url_for('team_manager') }}">Team</a>
                 <a href="{{ url_for('database_view') }}">Jobs</a>
+                <a href="/ai-estimator">AI Estimator</a>
             </div>
         </nav>
     </header>

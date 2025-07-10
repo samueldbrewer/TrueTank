@@ -77,6 +77,35 @@ class Customer(db.Model):
     
     def __repr__(self):
         return f'<Customer {self.first_name} {self.last_name}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'company_name': self.company_name,
+            'customer_type': self.customer_type,
+            'email': self.email,
+            'phone_primary': self.phone_primary,
+            'phone_secondary': self.phone_secondary,
+            'street_address': self.street_address,
+            'city': self.city,
+            'state': self.state,
+            'zip_code': self.zip_code,
+            'county': self.county,
+            'billing_street_address': self.billing_street_address,
+            'billing_city': self.billing_city,
+            'billing_state': self.billing_state,
+            'billing_zip_code': self.billing_zip_code,
+            'preferred_contact_method': self.preferred_contact_method,
+            'payment_terms': self.payment_terms,
+            'tax_exempt': self.tax_exempt,
+            'tax_exempt_number': self.tax_exempt_number,
+            'service_reminders': self.service_reminders,
+            'marketing_emails': self.marketing_emails,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
 
 class SepticSystem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -497,4 +526,36 @@ class TeamMember(db.Model):
             'hire_date': self.hire_date.isoformat() if self.hire_date else None,
             'cdl_license': self.cdl_license,
             'septic_certification': self.septic_certification
+        }
+
+class TruckTeamAssignment(db.Model):
+    __tablename__ = 'truck_team_assignment'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    truck_id = db.Column(db.Integer, db.ForeignKey('truck.id'), nullable=False)
+    team_member_id = db.Column(db.Integer, db.ForeignKey('team_member.id'), nullable=True)  # Null = no assignment
+    assignment_date = db.Column(db.Date, nullable=False)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    truck = db.relationship('Truck', backref='team_assignments')
+    team_member = db.relationship('TeamMember', backref='truck_assignments')
+    
+    # Unique constraint - one assignment per truck per date
+    __table_args__ = (db.UniqueConstraint('truck_id', 'assignment_date', name='unique_truck_assignment_per_date'),)
+    
+    def __repr__(self):
+        return f'<TruckTeamAssignment Truck:{self.truck_id} Member:{self.team_member_id} Date:{self.assignment_date}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'truck_id': self.truck_id,
+            'team_member_id': self.team_member_id,
+            'assignment_date': self.assignment_date.isoformat() if self.assignment_date else None,
+            'truck_number': self.truck.truck_number if self.truck else None,
+            'team_member_name': f"{self.team_member.first_name} {self.team_member.last_name}" if self.team_member else None
         }
