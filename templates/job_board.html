@@ -12,15 +12,6 @@
                 <input type="date" id="selected-date" class="date-picker" value="">
                 <button id="next-day" class="btn btn-sm btn-secondary">Next ›</button>
             </div>
-            <div class="sort-controls">
-                <label for="sort-pending">Sort pending by:</label>
-                <select id="sort-pending" class="sort-select">
-                    <option value="oldest">Oldest first</option>
-                    <option value="due_date">Due date</option>
-                    <option value="priority">Priority</option>
-                    <option value="customer">Customer name</option>
-                </select>
-            </div>
             <div class="board-actions">
                 <a href="{{ url_for('create_ticket') }}" class="btn btn-secondary">+ Create Ticket</a>
                 <button id="refresh-board" class="btn btn-primary">🔄 Refresh</button>
@@ -35,7 +26,26 @@
                 <h3>Pending Jobs</h3>
                 <span id="pending-count" class="badge">0</span>
             </div>
-            <div id="pending-tickets" class="ticket-list">
+            
+            <!-- Search Bar -->
+            <div class="search-controls">
+                <input type="text" id="search-pending" class="search-input" placeholder="Search tickets...">
+            </div>
+            
+            <!-- Sort Controls -->
+            <div class="sort-controls">
+                <label for="sort-pending">Sort by:</label>
+                <select id="sort-pending" class="sort-select">
+                    <option value="oldest">Oldest first</option>
+                    <option value="due_date">Due date</option>
+                    <option value="priority">Priority</option>
+                    <option value="customer">Customer name</option>
+                </select>
+            </div>
+            
+            <div id="pending-tickets" class="ticket-list" 
+                 ondrop="handleDrop(event)" 
+                 ondragover="handleDragOver(event)">
                 <!-- Pending tickets will be loaded here -->
             </div>
         </div>
@@ -108,16 +118,43 @@
     font-size: 1rem;
 }
 
+.search-controls {
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
 .sort-controls {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.sort-controls label {
+    font-size: 0.9rem;
+    color: #666;
 }
 
 .sort-select {
+    flex: 1;
     padding: 0.5rem;
     border: 1px solid #ddd;
     border-radius: 4px;
+    font-size: 0.9rem;
 }
 
 .board-actions {
@@ -314,6 +351,27 @@
     font-style: italic;
 }
 
+.ticket-actions {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #ecf0f1;
+}
+
+.btn-action {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-action:hover {
+    background: #2980b9;
+}
+
 .drop-zone {
     border: 2px dashed #3498db;
     background: rgba(52, 152, 219, 0.1);
@@ -327,6 +385,16 @@
 .drop-zone.drag-over {
     background: rgba(52, 152, 219, 0.2);
     border-color: #2980b9;
+}
+
+.no-results {
+    text-align: center;
+    color: #7f8c8d;
+    font-style: italic;
+    padding: 2rem 1rem;
+    border: 2px dashed #ecf0f1;
+    border-radius: 6px;
+    margin: 1rem 0;
 }
 
 /* Modal Styles */
@@ -413,6 +481,9 @@ let currentDate = new Date().toISOString().split('T')[0];
 let currentTruckId = null;
 let trucks = [];
 let teamAssignments = {};
+let allPendingTickets = []; // Store all pending tickets for search functionality
+let currentSearchTerm = '';
+let currentSortBy = 'oldest';
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize date picker with today's date
@@ -441,7 +512,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     document.getElementById('sort-pending').addEventListener('change', function() {
+        currentSortBy = this.value;
         loadJobBoard();
+    });
+    
+    document.getElementById('search-pending').addEventListener('input', function() {
+        currentSearchTerm = this.value.toLowerCase();
+        filterAndDisplayPendingTickets();
     });
     
     document.getElementById('refresh-board').addEventListener('click', function() {
@@ -453,16 +530,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadJobBoard() {
-    const sortBy = document.getElementById('sort-pending').value;
-    const url = `/api/job-board?date=${currentDate}&sort=${sortBy}`;
+    const url = `/api/job-board?date=${currentDate}&sort=${currentSortBy}`;
     
     fetch(url)
         .then(response => response.json())
         .then(data => {
             trucks = data.trucks;
-            renderPendingTickets(data.pending_tickets);
+            allPendingTickets = data.pending_tickets;
+            currentSortBy = data.sort_by;
+            
+            // Update sort dropdown
+            document.getElementById('sort-pending').value = currentSortBy;
+            
+            // Filter and display pending tickets
+            filterAndDisplayPendingTickets();
+            
             renderTruckColumns(data.trucks, data.truck_schedules);
-            updatePendingCount(data.pending_tickets.length);
         })
         .catch(error => {
             console.error('Error loading job board:', error);
@@ -470,9 +553,40 @@ function loadJobBoard() {
         });
 }
 
+function filterAndDisplayPendingTickets() {
+    let filteredTickets = allPendingTickets;
+    
+    // Apply search filter
+    if (currentSearchTerm) {
+        filteredTickets = allPendingTickets.filter(ticket => {
+            const searchableText = [
+                ticket.job_id,
+                ticket.customer_name,
+                ticket.service_type,
+                ticket.service_description,
+                ticket.priority,
+                ticket.status
+            ].join(' ').toLowerCase();
+            
+            return searchableText.includes(currentSearchTerm);
+        });
+    }
+    
+    renderPendingTickets(filteredTickets);
+    updatePendingCount(filteredTickets.length);
+}
+
 function renderPendingTickets(tickets) {
     const container = document.getElementById('pending-tickets');
     container.innerHTML = '';
+    
+    if (tickets.length === 0) {
+        const noResults = document.createElement('div');
+        noResults.className = 'no-results';
+        noResults.textContent = currentSearchTerm ? 'No tickets match your search' : 'No pending tickets';
+        container.appendChild(noResults);
+        return;
+    }
     
     tickets.forEach(ticket => {
         const ticketCard = createTicketCard(ticket);
@@ -490,16 +604,29 @@ function renderTruckColumns(trucks, schedules) {
     });
 }
 
-function createTicketCard(ticket) {
+function createTicketCard(ticket, context = 'pending') {
     const card = document.createElement('div');
     card.className = `ticket-card priority-${ticket.priority}`;
     card.draggable = true;
     card.dataset.ticketId = ticket.id;
+    card.dataset.context = context;
     
     let dueDate = '';
     if (ticket.requested_service_date) {
         const due = new Date(ticket.requested_service_date);
         dueDate = `<div class="ticket-due">Due: ${due.toLocaleDateString()}</div>`;
+    }
+    
+    // Add actions for truck context
+    let actions = '';
+    if (context === 'truck') {
+        actions = `
+            <div class="ticket-actions">
+                <button class="btn-action" onclick="moveTicketToPending(${ticket.id})" title="Move to Pending">
+                    ← Pending
+                </button>
+            </div>
+        `;
     }
     
     card.innerHTML = `
@@ -510,6 +637,7 @@ function createTicketCard(ticket) {
         <div class="ticket-customer">${ticket.customer_name || 'No customer'}</div>
         <div class="ticket-service">${ticket.service_type || 'No service type'}</div>
         ${dueDate}
+        ${actions}
     `;
     
     // Add drag event listeners
@@ -535,15 +663,19 @@ function createTruckColumn(truck, tickets) {
             <div class="truck-info">${truck.make} ${truck.model}</div>
         </div>
         <div class="team-assignment">${teamDisplay}</div>
-        <div class="ticket-list" ondrop="handleDrop(event)" ondragover="handleDragOver(event)">
+        <div class="ticket-list" 
+             ondrop="handleDrop(event)" 
+             ondragover="handleDragOver(event)"
+             data-truck-id="${truck.id}">
             ${tickets.length === 0 ? '<div class="drop-zone">Drop tickets here</div>' : ''}
         </div>
     `;
     
     // Add existing tickets
     const ticketList = column.querySelector('.ticket-list');
-    tickets.forEach(ticket => {
-        const ticketCard = createTicketCard(ticket);
+    tickets.forEach((ticket, index) => {
+        const ticketCard = createTicketCard(ticket, 'truck');
+        ticketCard.dataset.routePosition = index;
         ticketList.appendChild(ticketCard);
     });
     
@@ -579,18 +711,40 @@ function handleDrop(e) {
     if (!draggedTicket) return;
     
     const truckColumn = e.target.closest('.truck-column');
-    const ticketList = truckColumn ? truckColumn.querySelector('.ticket-list') : null;
+    const pendingColumn = e.target.closest('.pending-column');
+    const ticketList = truckColumn ? truckColumn.querySelector('.ticket-list') : 
+                      pendingColumn ? pendingColumn.querySelector('.ticket-list') : null;
     
-    if (ticketList) {
+    if (truckColumn && ticketList) {
         const truckId = truckColumn.dataset.truckId;
         const ticketId = draggedTicket.dataset.ticketId;
+        const sourceTruckId = draggedTicket.closest('.truck-column')?.dataset.truckId;
         
         // Calculate route position based on drop location
-        const allTickets = Array.from(ticketList.querySelectorAll('.ticket-card'));
-        const routePosition = allTickets.length;
+        const allTickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging)'));
         
-        // Assign ticket to truck
-        assignTicketToTruck(ticketId, truckId, routePosition);
+        let routePosition = allTickets.length;
+        
+        // Find the position to insert based on Y coordinate
+        for (let i = 0; i < allTickets.length; i++) {
+            const ticketRect = allTickets[i].getBoundingClientRect();
+            if (e.clientY < ticketRect.top + ticketRect.height / 2) {
+                routePosition = i;
+                break;
+            }
+        }
+        
+        // If moving within the same truck, handle reordering
+        if (sourceTruckId === truckId) {
+            reorderTicketInTruck(ticketId, truckId, routePosition);
+        } else {
+            // Assign ticket to different truck
+            assignTicketToTruck(ticketId, truckId, routePosition);
+        }
+    } else if (pendingColumn) {
+        // Move ticket back to pending
+        const ticketId = draggedTicket.dataset.ticketId;
+        moveTicketToPending(ticketId);
     }
 }
 
@@ -620,6 +774,64 @@ function assignTicketToTruck(ticketId, truckId, routePosition) {
     .catch(error => {
         console.error('Error:', error);
         alert('Failed to assign ticket');
+    });
+}
+
+function reorderTicketInTruck(ticketId, truckId, newPosition) {
+    const data = {
+        ticket_id: ticketId,
+        truck_id: truckId,
+        route_position: newPosition,
+        scheduled_date: new Date(currentDate + 'T09:00:00').toISOString()
+    };
+    
+    fetch('/api/tickets/reorder-route', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            loadJobBoard(); // Refresh the entire board
+        } else {
+            alert('Error reordering ticket: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to reorder ticket');
+    });
+}
+
+function moveTicketToPending(ticketId) {
+    const data = {
+        ticket_id: ticketId,
+        truck_id: null,
+        scheduled_date: null,
+        route_position: null
+    };
+    
+    fetch('/api/tickets/assign', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            loadJobBoard(); // Refresh the entire board
+        } else {
+            alert('Error moving ticket to pending: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to move ticket to pending');
     });
 }
 

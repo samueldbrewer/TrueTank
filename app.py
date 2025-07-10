@@ -144,13 +144,10 @@ def get_job_board_data():
     # Get trucks
     trucks = Truck.query.filter_by(status='active').all()
     
-    # Get pending tickets (not scheduled or scheduled for different dates)
+    # Get pending tickets (only those not scheduled)
     pending_query = Ticket.query.filter(
-        db.or_(
-            Ticket.scheduled_date.is_(None),
-            db.func.date(Ticket.scheduled_date) != target_date
-        ),
-        Ticket.status.in_(['pending', 'scheduled'])
+        Ticket.scheduled_date.is_(None),
+        Ticket.status == 'pending'
     )
     
     # Apply sorting
@@ -452,6 +449,44 @@ def reorder_tickets():
             
             # Update the ticket's position
             ticket.column_position = new_position
+        
+        db.session.commit()
+        return jsonify({'success': True, 'ticket': ticket.to_dict()})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tickets/reorder-route', methods=['POST'])
+def reorder_route():
+    try:
+        from datetime import datetime
+        data = request.get_json()
+        
+        ticket_id = data.get('ticket_id')
+        truck_id = data.get('truck_id')
+        new_position = data.get('route_position', 0)
+        scheduled_date = data.get('scheduled_date')
+        
+        ticket = Ticket.query.get_or_404(ticket_id)
+        
+        # Get all tickets for this truck on this date
+        target_date = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00')).date()
+        truck_tickets = Ticket.query.filter(
+            Ticket.truck_id == truck_id,
+            db.func.date(Ticket.scheduled_date) == target_date,
+            Ticket.id != ticket_id
+        ).order_by(Ticket.route_position).all()
+        
+        # Adjust positions of other tickets
+        for i, other_ticket in enumerate(truck_tickets):
+            if i >= new_position:
+                other_ticket.route_position = i + 1
+            else:
+                other_ticket.route_position = i
+        
+        # Update the moved ticket
+        ticket.route_position = new_position
         
         db.session.commit()
         return jsonify({'success': True, 'ticket': ticket.to_dict()})
