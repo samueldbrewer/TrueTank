@@ -5,38 +5,672 @@
 {% block content %}
 <div class="job-board-container">
     <div class="board-header">
-        <h2>Septic Job Board</h2>
-        <div class="board-actions">
-            <a href="{{ url_for('create_ticket') }}" class="btn btn-secondary">+ Create Detailed Ticket</a>
-            <button id="add-job-btn" class="btn btn-primary">+ Quick Add Job</button>
+        <h2>Daily Job Scheduler</h2>
+        <div class="header-controls">
+            <div class="date-navigation">
+                <button id="prev-day" class="btn btn-sm btn-secondary">‹ Previous</button>
+                <input type="date" id="selected-date" class="date-picker" value="">
+                <button id="next-day" class="btn btn-sm btn-secondary">Next ›</button>
+            </div>
+            <div class="sort-controls">
+                <label for="sort-pending">Sort pending by:</label>
+                <select id="sort-pending" class="sort-select">
+                    <option value="oldest">Oldest first</option>
+                    <option value="due_date">Due date</option>
+                    <option value="priority">Priority</option>
+                    <option value="customer">Customer name</option>
+                </select>
+            </div>
+            <div class="board-actions">
+                <a href="{{ url_for('create_ticket') }}" class="btn btn-secondary">+ Create Ticket</a>
+                <button id="refresh-board" class="btn btn-primary">🔄 Refresh</button>
+            </div>
         </div>
     </div>
     
-    <div class="kanban-board">
-        <div class="column" id="pending-column">
-            <h3>Pending</h3>
-            <div class="card-container" data-status="pending">
-                <!-- Cards will be added here -->
+    <div class="truck-scheduler">
+        <!-- Pending Column (Left) -->
+        <div class="pending-column">
+            <div class="column-header">
+                <h3>Pending Jobs</h3>
+                <span id="pending-count" class="badge">0</span>
+            </div>
+            <div id="pending-tickets" class="ticket-list">
+                <!-- Pending tickets will be loaded here -->
             </div>
         </div>
         
-        <div class="column" id="in-progress-column">
-            <h3>In Progress</h3>
-            <div class="card-container" data-status="in-progress">
-                <!-- Cards will be added here -->
-            </div>
+        <!-- Truck Columns (Right) -->
+        <div class="truck-columns" id="truck-columns">
+            <!-- Truck columns will be dynamically generated here -->
         </div>
-        
-        <div class="column" id="completed-column">
-            <h3>Completed</h3>
-            <div class="card-container" data-status="completed">
-                <!-- Cards will be added here -->
+    </div>
+    
+    <!-- Team Assignment Modal -->
+    <div id="team-assignment-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Assign Team Member</h3>
+                <span class="close" onclick="closeTeamModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Select team member for <span id="modal-truck-name"></span> on <span id="modal-date"></span>:</p>
+                <select id="team-member-select">
+                    <option value="">No assignment</option>
+                    {% for member in team_members %}
+                    <option value="{{ member.id }}">{{ member.first_name }} {{ member.last_name }} ({{ member.position }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeTeamModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveTeamAssignment()">Assign</button>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.job-board-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.board-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.board-header h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.header-controls {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.date-navigation {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.date-picker {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sort-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.board-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.truck-scheduler {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1rem;
+    height: calc(100vh - 200px);
+    overflow: hidden;
+}
+
+.pending-column {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.column-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.badge {
+    background: #3498db;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.truck-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.truck-column {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.truck-header {
+    background: #34495e;
+    color: white;
+    padding: 1rem;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+}
+
+.truck-header:hover {
+    background: #2c3e50;
+}
+
+.truck-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.truck-header .truck-info {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-top: 0.25rem;
+}
+
+.team-assignment {
+    background: #ecf0f1;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.ticket-list {
+    flex: 1;
+    padding: 1rem;
+    min-height: 300px;
+}
+
+.ticket-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: move;
+    transition: all 0.2s ease;
+    border-left: 4px solid #3498db;
+}
+
+.ticket-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.ticket-card.priority-urgent {
+    border-left-color: #e74c3c;
+}
+
+.ticket-card.priority-high {
+    border-left-color: #f39c12;
+}
+
+.ticket-card.priority-medium {
+    border-left-color: #3498db;
+}
+
+.ticket-card.priority-low {
+    border-left-color: #95a5a6;
+}
+
+.ticket-card.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.ticket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.ticket-id {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.priority-badge {
+    padding: 0.125rem 0.375rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.priority-urgent {
+    background: #e74c3c;
+    color: white;
+}
+
+.priority-high {
+    background: #f39c12;
+    color: white;
+}
+
+.priority-medium {
+    background: #3498db;
+    color: white;
+}
+
+.priority-low {
+    background: #95a5a6;
+    color: white;
+}
+
+.ticket-customer {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.ticket-service {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.ticket-due {
+    color: #e67e22;
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+.drop-zone {
+    border: 2px dashed #3498db;
+    background: rgba(52, 152, 219, 0.1);
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+    color: #3498db;
+    margin: 0.5rem 0;
+}
+
+.drop-zone.drag-over {
+    background: rgba(52, 152, 219, 0.2);
+    border-color: #2980b9;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 0;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-body {
+    padding: 1rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding: 1rem;
+    border-top: 1px solid #ecf0f1;
+}
+
+@media (max-width: 768px) {
+    .truck-scheduler {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+    }
+    
+    .truck-columns {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+    
+    .board-actions {
+        margin-left: 0;
+    }
+}
+</style>
+
+<script>
+// Global variables
+let currentDate = new Date().toISOString().split('T')[0];
+let currentTruckId = null;
+let trucks = [];
+let teamAssignments = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize date picker with today's date
+    document.getElementById('selected-date').value = currentDate;
+    
+    // Event listeners
+    document.getElementById('selected-date').addEventListener('change', function() {
+        currentDate = this.value;
+        loadJobBoard();
+    });
+    
+    document.getElementById('prev-day').addEventListener('click', function() {
+        const date = new Date(currentDate);
+        date.setDate(date.getDate() - 1);
+        currentDate = date.toISOString().split('T')[0];
+        document.getElementById('selected-date').value = currentDate;
+        loadJobBoard();
+    });
+    
+    document.getElementById('next-day').addEventListener('click', function() {
+        const date = new Date(currentDate);
+        date.setDate(date.getDate() + 1);
+        currentDate = date.toISOString().split('T')[0];
+        document.getElementById('selected-date').value = currentDate;
+        loadJobBoard();
+    });
+    
+    document.getElementById('sort-pending').addEventListener('change', function() {
+        loadJobBoard();
+    });
+    
+    document.getElementById('refresh-board').addEventListener('click', function() {
+        loadJobBoard();
+    });
+    
+    // Load initial data
+    loadJobBoard();
+});
+
+function loadJobBoard() {
+    const sortBy = document.getElementById('sort-pending').value;
+    const url = `/api/job-board?date=${currentDate}&sort=${sortBy}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            trucks = data.trucks;
+            renderPendingTickets(data.pending_tickets);
+            renderTruckColumns(data.trucks, data.truck_schedules);
+            updatePendingCount(data.pending_tickets.length);
+        })
+        .catch(error => {
+            console.error('Error loading job board:', error);
+            alert('Failed to load job board data');
+        });
+}
+
+function renderPendingTickets(tickets) {
+    const container = document.getElementById('pending-tickets');
+    container.innerHTML = '';
+    
+    tickets.forEach(ticket => {
+        const ticketCard = createTicketCard(ticket);
+        container.appendChild(ticketCard);
+    });
+}
+
+function renderTruckColumns(trucks, schedules) {
+    const container = document.getElementById('truck-columns');
+    container.innerHTML = '';
+    
+    trucks.forEach(truck => {
+        const column = createTruckColumn(truck, schedules[truck.id] || []);
+        container.appendChild(column);
+    });
+}
+
+function createTicketCard(ticket) {
+    const card = document.createElement('div');
+    card.className = `ticket-card priority-${ticket.priority}`;
+    card.draggable = true;
+    card.dataset.ticketId = ticket.id;
+    
+    let dueDate = '';
+    if (ticket.requested_service_date) {
+        const due = new Date(ticket.requested_service_date);
+        dueDate = `<div class="ticket-due">Due: ${due.toLocaleDateString()}</div>`;
+    }
+    
+    card.innerHTML = `
+        <div class="ticket-header">
+            <span class="ticket-id">${ticket.job_id}</span>
+            <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
+        </div>
+        <div class="ticket-customer">${ticket.customer_name || 'No customer'}</div>
+        <div class="ticket-service">${ticket.service_type || 'No service type'}</div>
+        ${dueDate}
+    `;
+    
+    // Add drag event listeners
+    card.addEventListener('dragstart', handleDragStart);
+    card.addEventListener('dragend', handleDragEnd);
+    
+    return card;
+}
+
+function createTruckColumn(truck, tickets) {
+    const column = document.createElement('div');
+    column.className = 'truck-column';
+    column.dataset.truckId = truck.id;
+    
+    const assignedMember = teamAssignments[truck.id] || null;
+    const teamDisplay = assignedMember ? 
+        `Assigned: ${assignedMember.name}` : 
+        'Click to assign team member';
+    
+    column.innerHTML = `
+        <div class="truck-header" onclick="openTeamModal(${truck.id}, '${truck.truck_number}')">
+            <h4>${truck.truck_number}</h4>
+            <div class="truck-info">${truck.make} ${truck.model}</div>
+        </div>
+        <div class="team-assignment">${teamDisplay}</div>
+        <div class="ticket-list" ondrop="handleDrop(event)" ondragover="handleDragOver(event)">
+            ${tickets.length === 0 ? '<div class="drop-zone">Drop tickets here</div>' : ''}
+        </div>
+    `;
+    
+    // Add existing tickets
+    const ticketList = column.querySelector('.ticket-list');
+    tickets.forEach(ticket => {
+        const ticketCard = createTicketCard(ticket);
+        ticketList.appendChild(ticketCard);
+    });
+    
+    return column;
+}
+
+function updatePendingCount(count) {
+    document.getElementById('pending-count').textContent = count;
+}
+
+// Drag and Drop Functions
+let draggedTicket = null;
+
+function handleDragStart(e) {
+    draggedTicket = e.target;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    draggedTicket = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    
+    if (!draggedTicket) return;
+    
+    const truckColumn = e.target.closest('.truck-column');
+    const ticketList = truckColumn ? truckColumn.querySelector('.ticket-list') : null;
+    
+    if (ticketList) {
+        const truckId = truckColumn.dataset.truckId;
+        const ticketId = draggedTicket.dataset.ticketId;
+        
+        // Calculate route position based on drop location
+        const allTickets = Array.from(ticketList.querySelectorAll('.ticket-card'));
+        const routePosition = allTickets.length;
+        
+        // Assign ticket to truck
+        assignTicketToTruck(ticketId, truckId, routePosition);
+    }
+}
+
+function assignTicketToTruck(ticketId, truckId, routePosition) {
+    const data = {
+        ticket_id: ticketId,
+        truck_id: truckId,
+        scheduled_date: new Date(currentDate + 'T09:00:00').toISOString(),
+        route_position: routePosition
+    };
+    
+    fetch('/api/tickets/assign', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            loadJobBoard(); // Refresh the entire board
+        } else {
+            alert('Error assigning ticket: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to assign ticket');
+    });
+}
+
+// Team Assignment Functions
+function openTeamModal(truckId, truckNumber) {
+    currentTruckId = truckId;
+    document.getElementById('modal-truck-name').textContent = truckNumber;
+    document.getElementById('modal-date').textContent = new Date(currentDate).toLocaleDateString();
+    document.getElementById('team-assignment-modal').style.display = 'block';
+}
+
+function closeTeamModal() {
+    document.getElementById('team-assignment-modal').style.display = 'none';
+    currentTruckId = null;
+}
+
+function saveTeamAssignment() {
+    const memberId = document.getElementById('team-member-select').value;
+    const memberName = document.getElementById('team-member-select').selectedOptions[0].text;
+    
+    if (currentTruckId) {
+        if (memberId) {
+            teamAssignments[currentTruckId] = {
+                id: memberId,
+                name: memberName
+            };
+        } else {
+            delete teamAssignments[currentTruckId];
+        }
+        
+        // Update the display
+        const truckColumn = document.querySelector(`[data-truck-id="${currentTruckId}"]`);
+        const teamDisplay = teamAssignments[currentTruckId] ? 
+            `Assigned: ${teamAssignments[currentTruckId].name}` : 
+            'Click to assign team member';
+        truckColumn.querySelector('.team-assignment').textContent = teamDisplay;
+    }
+    
+    closeTeamModal();
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('team-assignment-modal');
+    if (event.target === modal) {
+        closeTeamModal();
+    }
+}
+</script>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/job_board.js') }}"></script>
+<!-- Custom job board script is included in the template -->
 {% endblock %}

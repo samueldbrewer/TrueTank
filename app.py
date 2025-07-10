@@ -28,7 +28,9 @@ def index():
 
 @app.route('/job-board')
 def job_board():
-    return render_template('job_board.html')
+    trucks = Truck.query.filter_by(status='active').all()
+    team_members = TeamMember.query.filter_by(employment_status='active').all()
+    return render_template('job_board.html', trucks=trucks, team_members=team_members)
 
 @app.route('/database')
 def database_view():
@@ -124,6 +126,72 @@ def edit_team_member(member_id):
 def get_tickets():
     tickets = Ticket.query.order_by(Ticket.status, Ticket.column_position).all()
     return jsonify([ticket.to_dict() for ticket in tickets])
+
+@app.route('/api/job-board', methods=['GET'])
+def get_job_board_data():
+    from datetime import datetime, date
+    
+    # Get date parameter (default to today)
+    date_str = request.args.get('date', date.today().isoformat())
+    try:
+        target_date = datetime.fromisoformat(date_str).date()
+    except ValueError:
+        target_date = date.today()
+    
+    # Get sort parameter for pending tickets
+    sort_by = request.args.get('sort', 'oldest')
+    
+    # Get trucks
+    trucks = Truck.query.filter_by(status='active').all()
+    
+    # Get pending tickets (not scheduled or scheduled for different dates)
+    pending_query = Ticket.query.filter(
+        db.or_(
+            Ticket.scheduled_date.is_(None),
+            db.func.date(Ticket.scheduled_date) != target_date
+        ),
+        Ticket.status.in_(['pending', 'scheduled'])
+    )
+    
+    # Apply sorting
+    if sort_by == 'oldest':
+        pending_tickets = pending_query.order_by(Ticket.created_at.asc()).all()
+    elif sort_by == 'due_date':
+        pending_tickets = pending_query.order_by(Ticket.requested_service_date.asc().nullslast()).all()
+    elif sort_by == 'priority':
+        # Custom priority order: urgent, high, medium, low
+        priority_order = db.case(
+            (Ticket.priority == 'urgent', 1),
+            (Ticket.priority == 'high', 2),
+            (Ticket.priority == 'medium', 3),
+            (Ticket.priority == 'low', 4),
+            else_=5
+        )
+        pending_tickets = pending_query.order_by(priority_order).all()
+    elif sort_by == 'customer':
+        pending_tickets = pending_query.join(Customer).order_by(Customer.last_name, Customer.first_name).all()
+    else:
+        pending_tickets = pending_query.order_by(Ticket.created_at.asc()).all()
+    
+    # Get scheduled tickets for the target date, organized by truck
+    scheduled_tickets = Ticket.query.filter(
+        db.func.date(Ticket.scheduled_date) == target_date
+    ).all()
+    
+    # Organize scheduled tickets by truck
+    truck_schedules = {}
+    for truck in trucks:
+        truck_tickets = [t for t in scheduled_tickets if t.truck_id == truck.id]
+        truck_tickets.sort(key=lambda x: x.route_position or 999)  # Sort by route position
+        truck_schedules[str(truck.id)] = [ticket.to_dict() for ticket in truck_tickets]
+    
+    return jsonify({
+        'date': target_date.isoformat(),
+        'pending_tickets': [ticket.to_dict() for ticket in pending_tickets],
+        'truck_schedules': truck_schedules,
+        'trucks': [{'id': t.id, 'truck_number': t.truck_number, 'make': t.make, 'model': t.model} for t in trucks],
+        'sort_by': sort_by
+    })
 
 @app.route('/api/tickets', methods=['POST'])
 def create_ticket_api():
@@ -392,6 +460,46 @@ def reorder_tickets():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/tickets/assign', methods=['POST'])
+def assign_ticket():
+    try:
+        from datetime import datetime
+        data = request.get_json()
+        
+        ticket_id = data.get('ticket_id')
+        truck_id = data.get('truck_id')
+        scheduled_date = data.get('scheduled_date')
+        route_position = data.get('route_position', 0)
+        
+        ticket = Ticket.query.get_or_404(ticket_id)
+        
+        # Update truck assignment
+        if truck_id:
+            ticket.truck_id = int(truck_id)
+        else:
+            ticket.truck_id = None
+            
+        # Update scheduled date
+        if scheduled_date:
+            try:
+                ticket.scheduled_date = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+                ticket.status = 'scheduled'
+            except ValueError:
+                return jsonify({'error': 'Invalid date format'}), 400
+        else:
+            ticket.scheduled_date = None
+            ticket.status = 'pending'
+            
+        # Update route position
+        ticket.route_position = route_position
+        
+        db.session.commit()
+        return jsonify({'success': True, 'ticket': ticket.to_dict()})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 # Customer Management APIs
 @app.route('/api/customers', methods=['POST'])
 def create_customer_api():
@@ -547,6 +655,25 @@ def delete_customer_api(customer_id):
         return jsonify({'error': str(e)}), 500
 
 # Septic System Management APIs
+@app.route('/api/septic-systems', methods=['GET'])
+def get_septic_systems():
+    customer_id = request.args.get('customer_id')
+    if customer_id:
+        systems = SepticSystem.query.filter_by(customer_id=customer_id).all()
+    else:
+        systems = SepticSystem.query.all()
+    
+    return jsonify([{
+        'id': system.id,
+        'customer_id': system.customer_id,
+        'system_type': system.system_type,
+        'tank_size': system.tank_size,
+        'tank_material': system.tank_material,
+        'num_compartments': system.num_compartments,
+        'system_condition': system.system_condition,
+        'access_notes': system.access_notes
+    } for system in systems])
+
 @app.route('/api/septic-systems', methods=['POST'])
 def create_septic_system_api():
     try:
