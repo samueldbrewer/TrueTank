@@ -11,6 +11,7 @@
                 <button id="prev-day" class="btn btn-sm btn-secondary">‹ Previous</button>
                 <input type="date" id="selected-date" class="date-picker" value="">
                 <button id="next-day" class="btn btn-sm btn-secondary">Next ›</button>
+                <button id="today-btn" class="btn btn-sm btn-primary">Today</button>
             </div>
             <div class="board-actions">
                 <a href="{{ url_for('create_ticket') }}" class="btn btn-secondary">+ Create Ticket</a>
@@ -397,6 +398,54 @@
     margin: 1rem 0;
 }
 
+/* Drag and Drop Enhancements */
+.ghost-card {
+    background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 25%, transparent 25%, transparent 50%, rgba(52, 152, 219, 0.1) 50%, rgba(52, 152, 219, 0.1) 75%, transparent 75%);
+    background-size: 8px 8px;
+    border: 2px dashed #3498db;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3498db;
+    font-style: italic;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { 
+        opacity: 0.6;
+        transform: scale(0.98);
+    }
+    50% { 
+        opacity: 0.9;
+        transform: scale(1.02);
+    }
+}
+
+.ticket-list.drag-over {
+    background-color: rgba(52, 152, 219, 0.05);
+    border-radius: 6px;
+}
+
+.ticket-card.ghost-placeholder {
+    opacity: 0.5;
+    background: linear-gradient(135deg, #ecf0f1 25%, transparent 25%, transparent 50%, #ecf0f1 50%, #ecf0f1 75%, transparent 75%);
+    background-size: 10px 10px;
+    border: 2px dashed #bdc3c7;
+    color: #7f8c8d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-style: italic;
+    min-height: 80px;
+}
+
 /* Modal Styles */
 .modal {
     position: fixed;
@@ -507,6 +556,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const date = new Date(currentDate);
         date.setDate(date.getDate() + 1);
         currentDate = date.toISOString().split('T')[0];
+        document.getElementById('selected-date').value = currentDate;
+        loadJobBoard();
+    });
+    
+    document.getElementById('today-btn').addEventListener('click', function() {
+        currentDate = new Date().toISOString().split('T')[0];
         document.getElementById('selected-date').value = currentDate;
         loadJobBoard();
     });
@@ -688,27 +743,121 @@ function updatePendingCount(count) {
 
 // Drag and Drop Functions
 let draggedTicket = null;
+let currentGhostCard = null;
+let targetPosition = null;
 
 function handleDragStart(e) {
     draggedTicket = e.target;
     e.target.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
+    
+    // Create ghost cards in all ticket lists
+    createGhostCards();
 }
 
 function handleDragEnd(e) {
     e.target.classList.remove('dragging');
     draggedTicket = null;
+    
+    // Remove all ghost cards
+    removeGhostCards();
+    
+    // Remove drag-over class from all lists
+    document.querySelectorAll('.ticket-list').forEach(list => {
+        list.classList.remove('drag-over');
+    });
 }
 
 function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    
+    const ticketList = e.target.closest('.ticket-list');
+    if (!ticketList) return;
+    
+    // Remove drag-over from all other lists and hide their ghost cards
+    document.querySelectorAll('.ticket-list').forEach(list => {
+        if (list !== ticketList) {
+            list.classList.remove('drag-over');
+            const ghostCard = list.querySelector('.ghost-card');
+            if (ghostCard) ghostCard.style.display = 'none';
+        }
+    });
+    
+    // Add drag-over visual feedback to current list
+    ticketList.classList.add('drag-over');
+    
+    // Show and position ghost card
+    updateGhostCardPosition(e, ticketList);
+}
+
+function createGhostCards() {
+    document.querySelectorAll('.ticket-list').forEach(ticketList => {
+        // Remove existing ghost card if any
+        const existingGhost = ticketList.querySelector('.ghost-card');
+        if (existingGhost) existingGhost.remove();
+        
+        // Create new ghost card
+        const ghostCard = document.createElement('div');
+        ghostCard.className = 'ghost-card';
+        ghostCard.textContent = 'Drop ticket here';
+        ghostCard.style.display = 'none';
+        
+        // Add to beginning of list
+        ticketList.insertBefore(ghostCard, ticketList.firstChild);
+    });
+}
+
+function removeGhostCards() {
+    document.querySelectorAll('.ghost-card').forEach(ghost => {
+        ghost.remove();
+    });
+    currentGhostCard = null;
+    targetPosition = null;
+}
+
+function updateGhostCardPosition(e, ticketList) {
+    const ghostCard = ticketList.querySelector('.ghost-card');
+    if (!ghostCard) return;
+    
+    ghostCard.style.display = 'flex';
+    currentGhostCard = ghostCard;
+    
+    const tickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging)'));
+    let insertPosition = 0;
+    
+    // Find where to position the ghost card
+    for (let i = 0; i < tickets.length; i++) {
+        const ticketRect = tickets[i].getBoundingClientRect();
+        const ticketMiddle = ticketRect.top + ticketRect.height / 2;
+        
+        if (e.clientY > ticketMiddle) {
+            insertPosition = i + 1;
+        } else {
+            insertPosition = i;
+            break;
+        }
+    }
+    
+    // Move ghost card to the correct position
+    if (insertPosition === 0) {
+        // Insert at beginning
+        ticketList.insertBefore(ghostCard, ticketList.firstChild);
+    } else if (insertPosition >= tickets.length) {
+        // Insert at end
+        ticketList.appendChild(ghostCard);
+    } else {
+        // Insert before the ticket at insertPosition
+        ticketList.insertBefore(ghostCard, tickets[insertPosition]);
+    }
+    
+    targetPosition = insertPosition;
 }
 
 function handleDrop(e) {
     e.preventDefault();
     
-    if (!draggedTicket) return;
+    if (!draggedTicket || targetPosition === null) return;
     
     const truckColumn = e.target.closest('.truck-column');
     const pendingColumn = e.target.closest('.pending-column');
@@ -720,19 +869,8 @@ function handleDrop(e) {
         const ticketId = draggedTicket.dataset.ticketId;
         const sourceTruckId = draggedTicket.closest('.truck-column')?.dataset.truckId;
         
-        // Calculate route position based on drop location
-        const allTickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging)'));
-        
-        let routePosition = allTickets.length;
-        
-        // Find the position to insert based on Y coordinate
-        for (let i = 0; i < allTickets.length; i++) {
-            const ticketRect = allTickets[i].getBoundingClientRect();
-            if (e.clientY < ticketRect.top + ticketRect.height / 2) {
-                routePosition = i;
-                break;
-            }
-        }
+        // Use the targetPosition from the ghost card
+        const routePosition = targetPosition;
         
         // If moving within the same truck, handle reordering
         if (sourceTruckId === truckId) {
