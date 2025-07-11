@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Time Calculator - TrueTank</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .calculator-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #2c5aa0;
+        }
+
+        .calculate-btn {
+            background: linear-gradient(135deg, #2c5aa0, #1e3d72);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(44, 90, 160, 0.3);
+        }
+
+        .calculate-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-container {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #2c5aa0;
+            display: none;
+        }
+
+        .results-container.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .result-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .result-value {
+            color: #2c5aa0;
+            font-weight: bold;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-top: 1rem;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        .address-example {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+            color: #2c5aa0;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .quick-addresses {
+            margin-top: 1rem;
+        }
+
+        .quick-addresses h4 {
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        .address-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .address-btn {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .address-btn:hover {
+            background: #dee2e6;
+            border-color: #adb5bd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>🚛 TrueTank</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/job-board" class="nav-link">Job Board</a>
+                <a href="/customers" class="nav-link">Customers</a>
+                <a href="/tickets" class="nav-link">Tickets</a>
+                <a href="/ai-estimator" class="nav-link">AI Estimator</a>
+                <a href="/drive-time-calculator" class="nav-link active">Drive Time</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="calculator-container">
+        <div class="page-header">
+            <h1>🗺️ Drive Time Calculator</h1>
+            <p>Calculate drive time and distance between customer locations</p>
+        </div>
+
+        <form id="driveTimeForm">
+            <div class="form-group">
+                <label for="originAddress">Origin Address</label>
+                <input type="text" id="originAddress" name="originAddress" 
+                       placeholder="Enter starting address" required>
+                <div class="address-example">Example: 123 Main St, Springfield, IL 62701</div>
+                <div class="quick-addresses">
+                    <h4>Quick Select:</h4>
+                    <div class="address-buttons">
+                        <button type="button" class="address-btn" onclick="setOrigin('TrueTank Office, 456 Business Blvd, Springfield, IL 62701')">TrueTank Office</button>
+                        <button type="button" class="address-btn" onclick="setOrigin('Springfield Waste Treatment, 789 Industrial Dr, Springfield, IL 62702')">Waste Treatment</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="destinationAddress">Destination Address</label>
+                <input type="text" id="destinationAddress" name="destinationAddress" 
+                       placeholder="Enter destination address" required>
+                <div class="address-example">Example: 987 Oak Ave, Springfield, IL 62703</div>
+                <div class="quick-addresses">
+                    <h4>Quick Select:</h4>
+                    <div class="address-buttons">
+                        <button type="button" class="address-btn" onclick="setDestination('123 Elm St, Springfield, IL 62701')">Sample Customer 1</button>
+                        <button type="button" class="address-btn" onclick="setDestination('456 Pine Rd, Springfield, IL 62702')">Sample Customer 2</button>
+                        <button type="button" class="address-btn" onclick="setDestination('789 Cedar Ln, Springfield, IL 62703')">Sample Customer 3</button>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="calculate-btn" id="calculateBtn">
+                🧮 Calculate Drive Time
+            </button>
+        </form>
+
+        <div class="results-container" id="resultsContainer">
+            <h3>📊 Drive Time Results</h3>
+            <div id="resultsContent"></div>
+        </div>
+
+        <div class="error-message" id="errorMessage" style="display: none;"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('driveTimeForm');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsContent = document.getElementById('resultsContent');
+        const errorMessage = document.getElementById('errorMessage');
+
+        function setOrigin(address) {
+            document.getElementById('originAddress').value = address;
+        }
+
+        function setDestination(address) {
+            document.getElementById('destinationAddress').value = address;
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            resultsContainer.classList.remove('show');
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        function showResults(data) {
+            hideError();
+            
+            resultsContent.innerHTML = `
+                <div class="result-item">
+                    <span class="result-label">🕐 Drive Time:</span>
+                    <span class="result-value">${data.duration_minutes} minutes</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">📏 Distance:</span>
+                    <span class="result-value">${data.distance_km} km</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">🎯 Origin Coordinates:</span>
+                    <span class="result-value">${data.origin_coords.latitude.toFixed(4)}, ${data.origin_coords.longitude.toFixed(4)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">🏁 Destination Coordinates:</span>
+                    <span class="result-value">${data.dest_coords.latitude.toFixed(4)}, ${data.dest_coords.longitude.toFixed(4)}</span>
+                </div>
+            `;
+            
+            resultsContainer.classList.add('show');
+        }
+
+        function setLoading(loading) {
+            if (loading) {
+                calculateBtn.disabled = true;
+                calculateBtn.innerHTML = '⏳ Calculating...';
+            } else {
+                calculateBtn.disabled = false;
+                calculateBtn.innerHTML = '🧮 Calculate Drive Time';
+            }
+        }
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const origin = document.getElementById('originAddress').value.trim();
+            const destination = document.getElementById('destinationAddress').value.trim();
+            
+            if (!origin || !destination) {
+                showError('Please enter both origin and destination addresses.');
+                return;
+            }
+
+            setLoading(true);
+            hideError();
+
+            try {
+                const response = await fetch('/api/drive-time', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        origin: origin,
+                        destination: destination
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showResults(data);
+                } else {
+                    showError(data.error || 'Failed to calculate drive time');
+                }
+            } catch (error) {
+                console.error('Drive time calculation error:', error);
+                showError('Network error: Could not connect to the server');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Auto-focus first input
+        document.getElementById('originAddress').focus();
+    </script>
+</body>
+</html>

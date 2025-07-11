@@ -1,4 +1,5 @@
 import os
+import requests
 from flask import Flask, render_template, request, jsonify
 from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember, TruckTeamAssignment
 from dotenv import load_dotenv
@@ -18,7 +19,11 @@ load_dotenv()
 app = Flask(__name__)
 
 # Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///truetank.db')
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///truetank.db')
+# Fix PostgreSQL URL format for newer SQLAlchemy versions
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Development vs Production configuration
@@ -29,6 +34,121 @@ else:
 
 # Initialize database
 db.init_app(app)
+
+# OpenRouteService configuration
+OPENROUTE_API_KEY = os.environ.get('OPENROUTE_API_KEY')
+OPENROUTE_BASE_URL = 'https://api.openrouteservice.org'
+
+def geocode_address(address):
+    """Convert address to coordinates using OpenRouteService geocoding"""
+    if not OPENROUTE_API_KEY:
+        print("Warning: OPENROUTE_API_KEY not configured")
+        return None
+    
+    try:
+        url = f"{OPENROUTE_BASE_URL}/geocode/search"
+        params = {
+            'api_key': OPENROUTE_API_KEY,
+            'text': address,
+            'size': 1,
+            'layers': 'address'
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        print(f"Geocoding response for '{address}': {data}")
+        print(f"Response type: {type(data)}")
+        print(f"Response keys: {data.keys() if isinstance(data, dict) else 'Not a dict'}")
+        
+        # Check if it's the OpenRouteService features format
+        if data.get('features') and len(data['features']) > 0:
+            coords = data['features'][0]['geometry']['coordinates']
+            return {'longitude': coords[0], 'latitude': coords[1]}
+        
+        # Check if it's a direct lat/lng format
+        elif data.get('lat') and data.get('lng'):
+            return {'longitude': data.get('lng'), 'latitude': data.get('lat')}
+        
+        # Check if it's a direct latitude/longitude format  
+        elif data.get('latitude') and data.get('longitude'):
+            return {'longitude': data.get('longitude'), 'latitude': data.get('latitude')}
+        
+        print(f"No geocoding results found for '{address}'")
+        return None
+    except Exception as e:
+        print(f"Geocoding error for '{address}': {e}")
+        return None
+
+def calculate_drive_time(origin_address, destination_address):
+    """Calculate drive time between two addresses in minutes"""
+    if not OPENROUTE_API_KEY:
+        print("Warning: OPENROUTE_API_KEY not configured")
+        return None
+    
+    try:
+        # First geocode both addresses
+        print(f"Geocoding origin: '{origin_address}'")
+        origin_coords = geocode_address(origin_address)
+        print(f"Origin coords: {origin_coords}")
+        
+        print(f"Geocoding destination: '{destination_address}'")
+        dest_coords = geocode_address(destination_address)
+        print(f"Destination coords: {dest_coords}")
+        
+        if not origin_coords or not dest_coords:
+            print(f"Could not geocode addresses: {origin_address} -> {destination_address}")
+            return None
+        
+        # Calculate route
+        url = f"{OPENROUTE_BASE_URL}/v2/directions/driving-car"
+        headers = {
+            'Authorization': OPENROUTE_API_KEY,
+            'Content-Type': 'application/json'
+        }
+        
+        # Handle both coordinate formats
+        origin_lon = origin_coords.get('longitude') or origin_coords.get('lng')
+        origin_lat = origin_coords.get('latitude') or origin_coords.get('lat')
+        dest_lon = dest_coords.get('longitude') or dest_coords.get('lng')  
+        dest_lat = dest_coords.get('latitude') or dest_coords.get('lat')
+        
+        print(f"Using coordinates: origin=[{origin_lon}, {origin_lat}], dest=[{dest_lon}, {dest_lat}]")
+        
+        data = {
+            'coordinates': [
+                [origin_lon, origin_lat],
+                [dest_lon, dest_lat]
+            ]
+        }
+        
+        response = requests.post(url, json=data, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        result = response.json()
+        if result['routes']:
+            # Duration is in seconds, convert to minutes
+            duration_minutes = result['routes'][0]['summary']['duration'] / 60
+            distance_km = result['routes'][0]['summary']['distance'] / 1000
+            
+            return {
+                'duration_minutes': round(duration_minutes, 1),
+                'distance_km': round(distance_km, 2),
+                'origin_coords': {
+                    'latitude': origin_lat,
+                    'longitude': origin_lon
+                },
+                'dest_coords': {
+                    'latitude': dest_lat,
+                    'longitude': dest_lon
+                }
+            }
+        
+        return None
+    except Exception as e:
+        print(f"Drive time calculation error: {e}")
+        return None
 
 @app.route('/')
 def index():
@@ -130,6 +250,10 @@ def team_manager():
 def ai_estimator():
     return render_template('ai_estimator.html')
 
+@app.route('/drive-time-calculator')
+def drive_time_calculator():
+    return render_template('drive_time_calculator.html')
+
 @app.route('/team-member/create')
 def create_team_member():
     return render_template('team_member_form.html')
@@ -199,7 +323,19 @@ def get_job_board_data():
         print(f"🚛 Before sort - Truck {truck.id}: {[(t.id, t.route_position) for t in truck_tickets]}")
         truck_tickets.sort(key=lambda x: x.route_position if x.route_position is not None else 999)  # Sort by route position
         print(f"🚛 After sort - Truck {truck.id}: {[(t.id, t.route_position) for t in truck_tickets]}")
-        truck_schedules[str(truck.id)] = [ticket.to_dict() for ticket in truck_tickets]
+        # Convert to dict with customer information
+        truck_tickets_with_customer = []
+        for ticket in truck_tickets:
+            ticket_dict = ticket.to_dict()
+            if ticket.customer:
+                ticket_dict['customer_name'] = f"{ticket.customer.first_name} {ticket.customer.last_name}"
+                ticket_dict['customer_address'] = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}"
+            else:
+                ticket_dict['customer_name'] = 'No customer'
+                ticket_dict['customer_address'] = 'No address'
+            truck_tickets_with_customer.append(ticket_dict)
+        
+        truck_schedules[str(truck.id)] = truck_tickets_with_customer
     
     # Get team assignments for the target date
     team_assignments = TruckTeamAssignment.query.filter_by(assignment_date=target_date).all()
@@ -2343,6 +2479,109 @@ def delete_job_board_ticket(ticket_id):
     except Exception as e:
         db.session.rollback()
         print(f"Error deleting ticket: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# Drive Time API Endpoints
+@app.route('/api/drive-time', methods=['POST'])
+def calculate_drive_time_api():
+    """Calculate drive time between two addresses"""
+    try:
+        data = request.get_json()
+        origin = data.get('origin')
+        destination = data.get('destination')
+        
+        if not origin or not destination:
+            return jsonify({'error': 'Origin and destination addresses required'}), 400
+        
+        result = calculate_drive_time(origin, destination)
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'duration_minutes': result['duration_minutes'],
+                'distance_km': result['distance_km'],
+                'origin_coords': result['origin_coords'],
+                'dest_coords': result['dest_coords']
+            })
+        else:
+            return jsonify({'error': 'Could not calculate drive time'}), 400
+            
+    except Exception as e:
+        print(f"Drive time API error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/route-optimization/<int:truck_id>/<date>', methods=['GET'])
+def optimize_truck_route(truck_id, date):
+    """Calculate optimized route with drive times for a truck's schedule"""
+    try:
+        from datetime import datetime
+        
+        # Parse date
+        target_date = datetime.fromisoformat(date).date()
+        
+        # Get truck tickets for the date
+        tickets = Ticket.query.filter(
+            Ticket.truck_id == truck_id,
+            db.func.date(Ticket.scheduled_date) == target_date
+        ).order_by(Ticket.route_position).all()
+        
+        if not tickets:
+            return jsonify({'success': True, 'route': [], 'total_drive_time': 0})
+        
+        # Get truck's starting location (we'll use first customer for now)
+        truck = Truck.query.get_or_404(truck_id)
+        
+        # Calculate drive times between consecutive stops
+        route_with_times = []
+        total_drive_time = 0
+        
+        for i, ticket in enumerate(tickets):
+            if not ticket.customer:
+                continue
+                
+            customer_address = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}"
+            
+            ticket_data = {
+                'ticket_id': ticket.id,
+                'job_id': ticket.job_id,
+                'customer_name': f"{ticket.customer.first_name} {ticket.customer.last_name}",
+                'address': customer_address,
+                'service_type': ticket.service_type,
+                'estimated_duration': ticket.estimated_duration or 60,
+                'route_position': ticket.route_position
+            }
+            
+            # Calculate drive time to this stop
+            if i > 0:
+                prev_customer = tickets[i-1].customer
+                if prev_customer:
+                    prev_address = f"{prev_customer.street_address}, {prev_customer.city}, {prev_customer.state}"
+                    drive_result = calculate_drive_time(prev_address, customer_address)
+                    
+                    if drive_result:
+                        ticket_data['drive_time_from_previous'] = drive_result['duration_minutes']
+                        ticket_data['distance_from_previous'] = drive_result['distance_km']
+                        total_drive_time += drive_result['duration_minutes']
+                    else:
+                        ticket_data['drive_time_from_previous'] = None
+                        ticket_data['distance_from_previous'] = None
+            else:
+                ticket_data['drive_time_from_previous'] = 0
+                ticket_data['distance_from_previous'] = 0
+            
+            route_with_times.append(ticket_data)
+        
+        return jsonify({
+            'success': True,
+            'truck_id': truck_id,
+            'date': date,
+            'route': route_with_times,
+            'total_drive_time': round(total_drive_time, 1),
+            'total_stops': len(route_with_times)
+        })
+        
+    except Exception as e:
+        print(f"Route optimization error: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

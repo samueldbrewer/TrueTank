@@ -616,7 +616,7 @@
     margin-bottom: 0.25rem;
 }
 
-.compact-job-id {
+.compact-customer-name {
     font-weight: bold;
     color: #2c3e50;
     font-size: 0.9rem;
@@ -1273,7 +1273,7 @@ function createTicketCard(ticket, context = 'pending') {
         console.log('Created truck card with draggable:', card.draggable);
         card.innerHTML = `
             <div class="compact-header">
-                <span class="compact-job-id">${ticket.job_id}</span>
+                <span class="compact-customer-name">${ticket.customer_name || 'No Customer'}</span>
                 <button class="btn-compact-action" onclick="event.stopPropagation(); moveTicketToPending(${ticket.id})" title="Move back to Pending">←</button>
             </div>
             <div class="compact-service">${ticket.service_type || 'Service'}</div>
@@ -1350,15 +1350,12 @@ function createTruckColumn(truck, tickets) {
                 <div class="truck-info">${truck.make} ${truck.model}</div>
             </div>
             <div class="truck-actions">
-                <button class="truck-action-btn map-btn" onclick="openTruckMap(${truck.id}, '${truck.truck_number}')" title="View route map">
-                    🗺️ Map
-                </button>
-                <button class="truck-action-btn team-btn" onclick="openTeamModal(${truck.id}, '${truck.truck_number}')" title="Assign team member">
-                    👥 Team
+                <button class="truck-action-btn map-btn" onclick="openTruckMap(${truck.id}, '${truck.truck_number}')" title="Plan route">
+                    📋 Plan
                 </button>
             </div>
         </div>
-        <div class="team-assignment">${teamDisplay}</div>
+        <div class="team-assignment" onclick="openTeamModal(${truck.id}, '${truck.truck_number}')" style="cursor: pointer;">${teamDisplay}</div>
         <div class="ticket-list" 
              data-truck-id="${truck.id}">
             ${tickets.length === 0 ? '<div class="drop-zone">Drop tickets here</div>' : ''}
