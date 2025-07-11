@@ -50,9 +50,7 @@
                 </select>
             </div>
             
-            <div id="pending-tickets" class="ticket-list" 
-                 ondrop="handleDrop(event)" 
-                 ondragover="handleDragOver(event)">
+            <div id="pending-tickets" class="ticket-list">
                 <!-- Pending tickets will be loaded here -->
             </div>
         </div>
@@ -94,13 +92,45 @@
                 <span class="close" onclick="closeTruckMapModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <div id="map-container">
-                    <div id="truck-map" style="height: 500px; width: 100%;"></div>
-                </div>
-                <div id="route-summary" class="route-summary">
-                    <h4>📍 Route Summary for <span id="summary-date"></span></h4>
-                    <div id="route-jobs-list" class="route-jobs-list">
-                        <!-- Jobs will be populated here -->
+                <div class="map-layout-container">
+                    <div id="route-summary" class="route-summary-sidebar">
+                        <!-- Truck Information Section -->
+                        <div class="truck-info-section">
+                            <h4>🚛 <span id="sidebar-truck-name"></span></h4>
+                            <div class="truck-details">
+                                <div id="truck-specs" class="detail-item">
+                                    <span class="detail-label">Vehicle:</span>
+                                    <span id="truck-make-model" class="detail-value"></span>
+                                </div>
+                                <div id="truck-capacity" class="detail-item">
+                                    <span class="detail-label">Capacity:</span>
+                                    <span id="truck-capacity-value" class="detail-value"></span>
+                                </div>
+                                <div id="truck-location" class="detail-item">
+                                    <span class="detail-label">Location:</span>
+                                    <span class="detail-value">Equipment Storage</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Team Assignment Section -->
+                        <div class="team-info-section">
+                            <h5>👤 Team Assignment</h5>
+                            <div id="assigned-team-member" class="team-member-info">
+                                <!-- Team member info will be populated here -->
+                            </div>
+                        </div>
+
+                        <!-- Route Summary Section -->
+                        <div class="route-section">
+                            <h5>📍 Route Summary for <span id="summary-date"></span></h5>
+                            <div id="route-jobs-list" class="route-jobs-list">
+                                <!-- Jobs will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div id="map-container" class="map-main-area">
+                        <div id="truck-map" style="height: 500px; width: 100%;"></div>
                     </div>
                 </div>
             </div>
@@ -338,7 +368,7 @@
     padding: 0.5rem;
     margin-bottom: 0.35rem;
     cursor: move;
-    transition: all 0.2s ease;
+    transition: all 0.2s ease, transform 0.15s ease;
     border-left: 3px solid #3498db;
     min-height: 60px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
@@ -475,36 +505,47 @@
     margin: 1rem 0;
 }
 
-/* Mouse-Following Drag and Drop Styles */
-.ticket-list.drag-over {
-    background-color: rgba(52, 152, 219, 0.08);
+/* Clean Drag and Drop Styles */
+.dragging-card {
+    cursor: grabbing !important;
+    opacity: 0.95 !important;
+    transform: rotate(-2deg) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+}
+
+.drop-placeholder {
+    background: #f0f8ff;
     border: 2px dashed #3498db;
     border-radius: 6px;
-    transition: all 0.2s ease;
+    padding: 0.5rem;
+    margin: 0.25rem;
+    text-align: center;
+    color: #3498db;
+    font-weight: 500;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    animation: placeholderSlideIn 0.15s ease-out;
 }
 
-/* Mouse follower - the card that sticks to cursor */
-.drag-follower {
-    background: white !important;
-    border: 2px solid #3498db !important;
-    cursor: grabbing !important;
-    transition: none !important;
-}
-
-/* Ghost preview - the duplicate showing drop position */
-.ghost-preview {
-    animation: ghost-pulse 0.8s ease-in-out infinite;
-    transition: all 0.2s ease;
-}
-
-@keyframes ghost-pulse {
-    0%, 100% { 
-        opacity: 0.4;
-        transform: scale(0.98);
+@keyframes placeholderSlideIn {
+    from {
+        opacity: 0;
+        transform: scaleY(0);
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
     }
-    50% { 
-        opacity: 0.7;
-        transform: scale(1.01);
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
     }
 }
 
@@ -516,9 +557,30 @@
     padding: 0.5rem;
     margin-bottom: 0.35rem;
     cursor: move;
-    transition: all 0.2s ease;
+    transition: all 0.2s ease, transform 0.15s ease;
     border-left: 3px solid #3498db;
     min-height: 45px;
+}
+
+/* Animate cards when they move to fill space */
+.ticket-list {
+    transition: all 0.15s ease;
+}
+
+.ticket-card-animate,
+.ticket-card-compact-animate {
+    animation: cardSlideUp 0.2s ease-out;
+}
+
+@keyframes cardSlideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0.8;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .ticket-card-compact:hover {
@@ -695,39 +757,193 @@
 
 .map-modal-content {
     width: 95%;
-    max-width: 1000px;
+    max-width: 1300px;
     max-height: 90vh;
     margin: 0;
+    display: flex;
+    flex-direction: column;
 }
 
-.route-summary {
-    margin-top: 1rem;
+.map-layout-container {
+    display: flex;
+    gap: 1rem;
+    height: 500px;
+    min-height: 500px;
+}
+
+.route-summary-sidebar {
+    width: 380px;
+    min-width: 380px;
     padding: 1rem;
     background: #f8f9fa;
     border-radius: 6px;
     border: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+    max-height: 500px;
 }
 
-.route-summary h4 {
-    margin: 0 0 1rem 0;
+/* Truck Information Section */
+.truck-info-section {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+}
+
+.truck-info-section h4 {
+    margin: 0 0 0.75rem 0;
     color: #2c3e50;
     font-size: 1.1rem;
 }
 
+.truck-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.detail-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.detail-value {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+/* Team Assignment Section */
+.team-info-section {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+}
+
+.team-info-section h5 {
+    margin: 0 0 0.75rem 0;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.team-member-info {
+    padding: 0.75rem;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.team-member-assigned {
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.team-member-unassigned {
+    color: #95a5a6;
+    font-style: italic;
+}
+
+/* Route Summary Section */
+.route-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.route-section h5 {
+    margin: 0 0 0.75rem 0;
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
 .route-jobs-list {
-    max-height: 200px;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.map-main-area {
+    flex: 1;
+    min-width: 0;
 }
 
 .route-job-item {
     display: flex;
     align-items: center;
     padding: 0.75rem;
-    margin-bottom: 0.5rem;
     background: white;
     border: 1px solid #dee2e6;
     border-radius: 4px;
     border-left: 3px solid #3498db;
+    cursor: move;
+    transition: all 0.2s ease, transform 0.15s ease;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+/* Animate route items when order changes */
+.route-job-item-animate {
+    animation: routeItemSlide 0.2s ease-out;
+}
+
+@keyframes routeItemSlide {
+    from {
+        transform: translateY(10px);
+        opacity: 0.8;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.route-job-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.route-job-item.dragging-route {
+    opacity: 0.5;
+    transform: rotate(2deg) scale(0.95);
+}
+
+.route-drop-placeholder {
+    background: #f0f8ff;
+    border: 2px dashed #3498db;
+    border-radius: 4px;
+    padding: 0.75rem;
+    text-align: center;
+    color: #3498db;
+    font-weight: 500;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    animation: routePlaceholderSlideIn 0.15s ease-out;
+    min-height: 60px;
+}
+
+@keyframes routePlaceholderSlideIn {
+    from {
+        opacity: 0;
+        transform: scaleY(0);
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        transform: scaleY(1);
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
 }
 
 .route-job-item.priority-urgent {
@@ -820,6 +1036,24 @@
     .map-modal-content {
         width: 98%;
         margin: 1rem auto;
+        max-height: 95vh;
+    }
+    
+    .map-layout-container {
+        flex-direction: column;
+        height: auto;
+        min-height: auto;
+    }
+    
+    .route-summary-sidebar {
+        width: 100%;
+        min-width: auto;
+        max-height: 200px;
+        order: 2;
+    }
+    
+    .map-main-area {
+        order: 1;
     }
     
     #truck-map {
@@ -833,6 +1067,7 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <script>
+console.log('🔄 JOB BOARD LOADED - CHECK FOR DRAG DROP FIX');
 // Global variables
 let currentDate = new Date().toISOString().split('T')[0];
 let currentTruckId = null;
@@ -848,6 +1083,24 @@ let mouseDownPos = {x: 0, y: 0};
 let isDragging = false;
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎯 TrueTank Job Board Loaded - Console is working!');
+    console.log('🔍 Checking for ticket elements...');
+    
+    // Debug: Check what elements exist
+    setTimeout(() => {
+        const pendingTickets = document.querySelectorAll('#pending-tickets .ticket-card');
+        const truckTickets = document.querySelectorAll('.truck-column .ticket-card-compact');
+        console.log('📊 Found pending tickets:', pendingTickets.length);
+        console.log('📊 Found truck tickets:', truckTickets.length);
+        
+        // Test draggable attribute
+        if (pendingTickets.length > 0) {
+            const firstTicket = pendingTickets[0];
+            console.log('🎪 First pending ticket draggable:', firstTicket.draggable);
+            console.log('🎪 First pending ticket dataset:', firstTicket.dataset);
+        }
+    }, 1000);
+    
     // Initialize date picker with today's date
     document.getElementById('selected-date').value = currentDate;
     
@@ -891,6 +1144,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('refresh-board').addEventListener('click', function() {
         loadJobBoard();
+    });
+    
+    // Add drag and drop event listeners to pending column
+    const pendingList = document.getElementById('pending-tickets');
+    pendingList.addEventListener('dragover', handleDragOver);
+    pendingList.addEventListener('drop', handleDrop);
+    console.log('✅ Added drag/drop listeners to pending list');
+    
+    // Test: Add document-level dragover listener to see if ANY dragover events fire
+    document.addEventListener('dragover', function(e) {
+        if (draggedCard) {
+            console.log('📍 DOCUMENT dragover on:', e.target.tagName, e.target.className);
+        }
     });
     
     // Load initial data
@@ -940,7 +1206,7 @@ function loadJobBoard() {
         })
         .catch(error => {
             console.error('Error loading job board:', error);
-            alert('Failed to load job board data');
+            // Don't show alert, just log the error
         });
 }
 
@@ -1003,7 +1269,8 @@ function createTicketCard(ticket, context = 'pending') {
     if (context === 'truck') {
         // Compact truck view - thinner card with just job ID and service type
         card.className = `ticket-card-compact priority-${ticket.priority}`;
-        card.draggable = true; // Enable dragging for truck tickets
+        card.setAttribute('draggable', 'true'); // Enable dragging for truck tickets
+        console.log('Created truck card with draggable:', card.draggable);
         card.innerHTML = `
             <div class="compact-header">
                 <span class="compact-job-id">${ticket.job_id}</span>
@@ -1012,8 +1279,15 @@ function createTicketCard(ticket, context = 'pending') {
             <div class="compact-service">${ticket.service_type || 'Service'}</div>
         `;
         // Add drag event listeners for truck tickets
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragend', handleDragEnd);
+        card.addEventListener('dragstart', function(e) {
+            console.log('Drag start - truck ticket:', card.dataset.ticketId);
+            handleDragStart(e);
+        });
+        card.addEventListener('dragend', function(e) {
+            console.log('Drag end - truck ticket:', card.dataset.ticketId);
+            handleDragEnd(e);
+        });
+        console.log('Added drag listeners to truck card:', card.dataset.ticketId);
         // Add click handler for expansion
         card.addEventListener('mousedown', handleCardMouseDown);
         card.addEventListener('mouseup', handleCardMouseUp);
@@ -1021,7 +1295,8 @@ function createTicketCard(ticket, context = 'pending') {
     } else {
         // Full pending view - detailed card with all information
         card.className = `ticket-card priority-${ticket.priority}`;
-        card.draggable = true; // Enable dragging for pending tickets to assign to trucks
+        card.setAttribute('draggable', 'true'); // Enable dragging for pending tickets to assign to trucks
+        console.log('Created pending card with draggable:', card.draggable);
         
         let dueDate = '';
         if (ticket.requested_service_date) {
@@ -1040,8 +1315,15 @@ function createTicketCard(ticket, context = 'pending') {
             ${dueDate}
         `;
         // Add drag event listeners for pending tickets
-        card.addEventListener('dragstart', handleDragStart);
-        card.addEventListener('dragend', handleDragEnd);
+        card.addEventListener('dragstart', function(e) {
+            console.log('Drag start - pending ticket:', card.dataset.ticketId);
+            handleDragStart(e);
+        });
+        card.addEventListener('dragend', function(e) {
+            console.log('Drag end - pending ticket:', card.dataset.ticketId);
+            handleDragEnd(e);
+        });
+        console.log('Added drag listeners to pending card:', card.dataset.ticketId);
         // Add click handler for expansion
         card.addEventListener('mousedown', handleCardMouseDown);
         card.addEventListener('mouseup', handleCardMouseUp);
@@ -1078,8 +1360,6 @@ function createTruckColumn(truck, tickets) {
         </div>
         <div class="team-assignment">${teamDisplay}</div>
         <div class="ticket-list" 
-             ondrop="handleDrop(event)" 
-             ondragover="handleDragOver(event)"
              data-truck-id="${truck.id}">
             ${tickets.length === 0 ? '<div class="drop-zone">Drop tickets here</div>' : ''}
         </div>
@@ -1087,11 +1367,18 @@ function createTruckColumn(truck, tickets) {
     
     // Add existing tickets
     const ticketList = column.querySelector('.ticket-list');
+    console.log(`🚛 Truck ${truck.id} tickets in order:`, tickets.map(t => `${t.id}(pos:${t.route_position})`));
     tickets.forEach((ticket, index) => {
         const ticketCard = createTicketCard(ticket, 'truck');
-        ticketCard.dataset.routePosition = index;
+        ticketCard.dataset.routePosition = ticket.route_position || index;
+        console.log(`📍 Adding ticket ${ticket.id} at DOM position ${index}, route_position: ${ticket.route_position}`);
         ticketList.appendChild(ticketCard);
     });
+    
+    // Add event listeners for drag and drop
+    ticketList.addEventListener('dragover', handleDragOver);
+    ticketList.addEventListener('drop', handleDrop);
+    console.log('✅ Added drag/drop listeners to truck list:', truck.id);
     
     return column;
 }
@@ -1100,202 +1387,239 @@ function updatePendingCount(count) {
     document.getElementById('pending-count').textContent = count;
 }
 
-// Mouse-Following Drag and Drop with Ghost Preview
-let draggedElement = null;
-let dragFollower = null;
-let ghostElement = null;
-let currentDropTarget = null;
+// Clean Drag and Drop - Simple and Precise
+let draggedCard = null;
+let mouseCard = null;
+let dropPlaceholder = null;
+let dropPosition = 0;
 
+// Start dragging
 function handleDragStart(e) {
-    draggedElement = e.target.closest('.ticket-card, .ticket-card-compact');
-    if (!draggedElement) return;
+    console.log('handleDragStart called');
+    const card = e.target.closest('.ticket-card, .ticket-card-compact');
+    if (!card) {
+        console.log('No card found in handleDragStart');
+        return;
+    }
     
-    // Create the mouse follower (actual card that follows cursor)
-    createMouseFollower(draggedElement);
+    console.log('Setting draggedCard to:', card.dataset.ticketId);
+    draggedCard = card;
     
-    // Completely hide the original element so others move up to fill space
-    draggedElement.style.display = 'none';
-    
-    // Set up drag data
+    // Set drag data first
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', ''); // Required for some browsers
+    e.dataTransfer.setData('text/plain', card.dataset.ticketId);
+    
+    // Delay removing the card from layout to allow drag to initialize
+    setTimeout(() => {
+        if (draggedCard) {
+            draggedCard.style.position = 'absolute';
+            draggedCard.style.top = '-9999px';
+            draggedCard.style.left = '-9999px';
+            draggedCard.style.zIndex = '-1';
+            draggedCard.classList.add('dragging');
+            
+            // Animate remaining cards sliding up to fill space
+            animateCardsAfterRemoval(draggedCard);
+            
+            console.log('Removed card from layout during drag');
+        }
+    }, 50);
+    
+    console.log('Drag start completed');
 }
 
-function createMouseFollower(originalElement) {
-    // Create a clone that will follow the mouse
-    dragFollower = originalElement.cloneNode(true);
-    dragFollower.classList.add('drag-follower');
-    dragFollower.style.position = 'fixed';
-    dragFollower.style.pointerEvents = 'none';
-    dragFollower.style.zIndex = '9999';
-    dragFollower.style.transform = 'rotate(-2deg) scale(1.05)';
-    dragFollower.style.boxShadow = '0 8px 20px rgba(0,0,0,0.25)';
-    dragFollower.style.opacity = '0.95';
-    
-    document.body.appendChild(dragFollower);
-    
-    // Position it at the mouse cursor initially
-    document.addEventListener('dragover', updateMouseFollowerPosition);
-}
-
-function updateMouseFollowerPosition(e) {
-    if (dragFollower) {
-        // Offset the follower so it doesn't interfere with drag events
-        dragFollower.style.left = (e.clientX + 10) + 'px';
-        dragFollower.style.top = (e.clientY + 10) + 'px';
+// Update mouse-following card position
+function updateMouseCard(e) {
+    if (mouseCard) {
+        mouseCard.style.left = (e.clientX - mouseCard.offsetWidth / 2) + 'px';
+        mouseCard.style.top = (e.clientY - 20) + 'px';
     }
 }
 
-function handleDragEnd(e) {
-    // Clean up everything
-    if (draggedElement) {
-        draggedElement.style.display = '';
-        draggedElement = null;
-    }
-    
-    if (dragFollower) {
-        dragFollower.remove();
-        dragFollower = null;
-        document.removeEventListener('dragover', updateMouseFollowerPosition);
-    }
-    
-    if (ghostElement) {
-        ghostElement.remove();
-        ghostElement = null;
-    }
-    
-    currentDropTarget = null;
-    
-    // Clean up visual feedback
-    document.querySelectorAll('.ticket-list').forEach(list => {
-        list.classList.remove('drag-over');
-    });
-}
-
+// Handle drag over
 function handleDragOver(e) {
+    console.log('🌊 DRAGOVER EVENT FIRED on:', e.target.tagName, e.target.className);
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    if (!draggedElement) return;
+    if (!draggedCard) {
+        console.log('❌ No draggedCard in dragover');
+        return;
+    }
+    
+    // Add visual feedback to show valid drop zones
+    const targetList = e.target.closest('.ticket-list');
+    if (!targetList) {
+        console.log('❌ No .ticket-list found, target was:', e.target.tagName, e.target.className);
+        removePlaceholder();
+        return;
+    }
+    
+    targetList.style.backgroundColor = 'rgba(52, 152, 219, 0.1)';
+    console.log('✅ Over valid drop zone:', targetList.dataset.truckId || 'pending');
+    
+    const truckColumn = targetList.closest('.truck-column');
+    const pendingColumn = targetList.closest('.pending-column');
+    const sourceIsPending = draggedCard.closest('.pending-column');
+    
+    // Don't allow dropping in pending if already from pending
+    if (pendingColumn && sourceIsPending) {
+        removePlaceholder();
+        return;
+    }
+    
+    // Only show placeholder in truck columns
+    if (truckColumn) {
+        console.log('🚛 Dragging over TRUCK column:', truckColumn.dataset.truckId);
+        showDropPlaceholder(e, targetList);
+    } else {
+        console.log('📝 Dragging over PENDING column or other');
+        removePlaceholder();
+    }
+}
+
+// Show drop placeholder
+function showDropPlaceholder(e, targetList) {
+    // Remove existing placeholder first to avoid counting it
+    removePlaceholder();
+    
+    // Exclude the dragged card and any existing placeholders from position calculation
+    const tickets = Array.from(targetList.querySelectorAll('.ticket-card-compact:not(.dragging)'))
+        .filter(card => card.dataset.ticketId !== draggedCard.dataset.ticketId && !card.classList.contains('drop-placeholder'));
+    const mouseY = e.clientY;
+    
+    console.log(`🎯 Position calc: ${tickets.length} tickets (excluding dragged: ${draggedCard.dataset.ticketId})`);
+    console.log(`🎯 Tickets found:`, tickets.map(t => t.dataset.ticketId));
+    console.log(`🎯 Mouse Y: ${mouseY}`);
+    
+    // Find drop position
+    dropPosition = 0;
+    let insertBefore = null;
+    
+    for (let i = 0; i < tickets.length; i++) {
+        const rect = tickets[i].getBoundingClientRect();
+        const midPoint = rect.top + rect.height / 2;
+        console.log(`📏 Ticket ${tickets[i].dataset.ticketId}: top=${rect.top}, bottom=${rect.bottom}, midPoint=${midPoint}, mouseY=${mouseY}`);
+        
+        if (mouseY < midPoint) {
+            dropPosition = i;
+            insertBefore = tickets[i];
+            console.log(`📍 Inserting at position ${i} (before ticket ${tickets[i].dataset.ticketId})`);
+            break;
+        }
+        dropPosition = i + 1;
+    }
+    
+    if (insertBefore === null) {
+        console.log(`📍 Inserting at end (position ${dropPosition})`);
+    }
+    
+    // Create new placeholder
+    dropPlaceholder = document.createElement('div');
+    dropPlaceholder.className = 'drop-placeholder';
+    dropPlaceholder.textContent = 'Drop card here';
+    
+    // Match the size of compact cards
+    const sampleCard = targetList.querySelector('.ticket-card-compact');
+    if (sampleCard) {
+        dropPlaceholder.style.height = sampleCard.offsetHeight + 'px';
+    }
+    
+    // Insert placeholder
+    if (insertBefore) {
+        targetList.insertBefore(dropPlaceholder, insertBefore);
+    } else {
+        targetList.appendChild(dropPlaceholder);
+    }
+    
+    // Animate cards that come after the placeholder
+    animateCardsOnPlaceholder();
+    
+    // Store position for drop
+    targetList.dataset.dropPosition = dropPosition;
+}
+
+// Remove placeholder
+function removePlaceholder() {
+    if (dropPlaceholder) {
+        dropPlaceholder.remove();
+        dropPlaceholder = null;
+    }
+}
+
+// Handle drop
+function handleDrop(e) {
+    e.preventDefault();
+    console.log('🎯 DROP EVENT TRIGGERED!');
+    
+    if (!draggedCard) {
+        console.log('❌ No dragged card found');
+        return;
+    }
+    console.log('✅ Dragged card found:', draggedCard.dataset.ticketId);
     
     const targetList = e.target.closest('.ticket-list');
     if (!targetList) {
-        removeGhostElement();
+        console.log('❌ No target list found for drop - target was:', e.target.tagName, e.target.className);
         return;
     }
+    console.log('✅ Target list found for drop');
     
     const truckColumn = targetList.closest('.truck-column');
     const pendingColumn = targetList.closest('.pending-column');
-    const sourceIsPending = draggedElement.closest('.pending-column');
+    const sourceIsPending = draggedCard.closest('.pending-column');
+    const sourceTruckColumn = draggedCard.closest('.truck-column');
     
-    // Don't allow reordering within pending column
-    if (pendingColumn && sourceIsPending) {
-        removeGhostElement();
-        return;
-    }
-    
-    // Show visual feedback for valid drop zones
-    document.querySelectorAll('.ticket-list').forEach(list => {
-        list.classList.remove('drag-over');
-    });
-    targetList.classList.add('drag-over');
-    
-    // Show ghost element in truck columns
-    if (truckColumn) {
-        showGhostElement(e, targetList);
-    } else {
-        removeGhostElement();
-    }
-}
-
-function showGhostElement(e, targetList) {
-    const tickets = Array.from(targetList.querySelectorAll('.ticket-card-compact:not(.dragging)'));
-    const mouseY = e.clientY;
-    
-    let insertIndex = 0;
-    let insertBeforeElement = null;
-    
-    // Find the correct insertion point
-    for (let i = 0; i < tickets.length; i++) {
-        const ticket = tickets[i];
-        const rect = ticket.getBoundingClientRect();
-        const ticketMiddle = rect.top + rect.height / 2;
-        
-        if (mouseY < ticketMiddle) {
-            insertIndex = i;
-            insertBeforeElement = ticket;
-            break;
-        } else {
-            insertIndex = i + 1;
-        }
-    }
-    
-    // Create or update ghost element
-    if (!ghostElement || currentDropTarget !== targetList) {
-        removeGhostElement();
-        
-        // Create ghost duplicate of the dragged element
-        ghostElement = draggedElement.cloneNode(true);
-        ghostElement.classList.add('ghost-preview');
-        ghostElement.style.opacity = '0.6';
-        ghostElement.style.border = '2px dashed #3498db';
-        ghostElement.style.background = 'rgba(52, 152, 219, 0.1)';
-        ghostElement.style.pointerEvents = 'none';
-        
-        currentDropTarget = targetList;
-    }
-    
-    // Position the ghost element
-    if (insertBeforeElement) {
-        targetList.insertBefore(ghostElement, insertBeforeElement);
-    } else {
-        targetList.appendChild(ghostElement);
-    }
-    
-    // Store the insertion index for the drop handler
-    targetList.dataset.dropIndex = insertIndex;
-}
-
-function removeGhostElement() {
-    if (ghostElement) {
-        ghostElement.remove();
-        ghostElement = null;
-    }
-    currentDropTarget = null;
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    
-    if (!draggedElement) return;
-    
-    const targetList = e.target.closest('.ticket-list');
-    if (!targetList) return;
-    
-    const truckColumn = targetList.closest('.truck-column');
-    const pendingColumn = targetList.closest('.pending-column');
-    const sourceIsPending = draggedElement.closest('.pending-column');
-    const sourceTruckColumn = draggedElement.closest('.truck-column');
-    
-    const ticketId = draggedElement.dataset.ticketId;
+    const ticketId = draggedCard.dataset.ticketId;
     
     if (truckColumn) {
         const truckId = truckColumn.dataset.truckId;
         const sourceTruckId = sourceTruckColumn?.dataset.truckId;
-        const dropIndex = parseInt(targetList.dataset.dropIndex || '0');
+        const position = parseInt(targetList.dataset.dropPosition || '0');
+        
+        console.log(`🎯 DROP: ticket ${ticketId}, sourceTruck: ${sourceTruckId}, targetTruck: ${truckId}, position: ${position}`);
         
         if (sourceTruckId === truckId) {
             // Reordering within same truck
-            reorderTicketInTruck(ticketId, truckId, dropIndex);
+            console.log(`🔄 REORDERING within truck ${truckId} at position ${position}`);
+            reorderTicketInTruck(ticketId, truckId, position);
         } else {
             // Moving from pending or different truck
-            assignTicketToTruck(ticketId, truckId, dropIndex);
+            console.log(`➡️ ASSIGNING to truck ${truckId} at position ${position}`);
+            assignTicketToTruck(ticketId, truckId, position);
         }
     } else if (pendingColumn && !sourceIsPending) {
         // Moving back to pending from a truck
         moveTicketToPending(ticketId);
     }
 }
+
+// Clean up after drag
+function handleDragEnd(e) {
+    console.log('handleDragEnd called');
+    // Restore original card appearance
+    if (draggedCard) {
+        draggedCard.style.position = '';
+        draggedCard.style.top = '';
+        draggedCard.style.left = '';
+        draggedCard.style.zIndex = '';
+        draggedCard.classList.remove('dragging');
+        draggedCard = null;
+        console.log('Restored card to layout');
+    }
+    
+    // Remove visual feedback from all drop zones
+    document.querySelectorAll('.ticket-list').forEach(list => {
+        list.style.backgroundColor = '';
+    });
+    
+    // Remove placeholder
+    removePlaceholder();
+    
+    dropPosition = 0;
+}
+
+// Removed mouse tracking since we're using simpler drag approach
 
 function assignTicketToTruck(ticketId, truckId, routePosition) {
     const data = {
@@ -1327,6 +1651,7 @@ function assignTicketToTruck(ticketId, truckId, routePosition) {
 }
 
 function reorderTicketInTruck(ticketId, truckId, newPosition) {
+    console.log('Frontend sending position:', newPosition, 'for ticket:', ticketId);
     const data = {
         ticket_id: ticketId,
         truck_id: truckId,
@@ -1572,11 +1897,31 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
     console.log('Truck info:', truckInfo);
     console.log('Assigned team member:', assignedTeamMember);
     
+    // Populate sidebar with truck and team information
+    populateSidebarInfo(truckInfo, assignedTeamMember);
+    
     // Use tickets from database (already sorted by route_position in the API)
     // The API endpoint sorts by route_position which is updated by drag & drop
     const orderedTickets = truckTickets;
     
     console.log('Using database order - tickets are already sorted by route_position:', orderedTickets);
+    
+    // Clear existing map and markers before reinitializing
+    if (truckMap) {
+        // Clear all markers
+        mapMarkers.forEach(marker => {
+            try {
+                marker.remove();
+            } catch (e) {
+                console.error('Error removing marker:', e);
+            }
+        });
+        mapMarkers = [];
+        
+        // Remove the map instance
+        truckMap.remove();
+        truckMap = null;
+    }
     
     // Clear the map container
     const mapContainer = document.getElementById('truck-map');
@@ -1598,10 +1943,6 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     }).addTo(truckMap);
-    
-    // Clear existing markers
-    mapMarkers.forEach(marker => marker.remove());
-    mapMarkers = [];
     
     // Array to track all points for map bounds
     const allPoints = [];
@@ -1694,8 +2035,12 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
                 </div>
             `;
             
-            jobMarker.bindPopup(popupContent);
-            mapMarkers.push(jobMarker);
+            try {
+                jobMarker.bindPopup(popupContent);
+                mapMarkers.push(jobMarker);
+            } catch (e) {
+                console.error('Error binding popup to marker:', e);
+            }
         });
         
         // Create route summary with the ordered tickets
@@ -1776,25 +2121,52 @@ function createRouteSummary(tickets) {
         return;
     }
     
-    routeJobsList.innerHTML = tickets.map((ticket, index) => {
+    routeJobsList.innerHTML = '';
+    
+    // Remove existing event listeners to avoid duplicates
+    routeJobsList.removeEventListener('dragover', handleRouteItemDragOver);
+    routeJobsList.removeEventListener('drop', handleRouteItemDrop);
+    routeJobsList.removeEventListener('dragenter', handleRouteContainerDragEnter);
+    
+    // Add drag event listeners to the container
+    routeJobsList.addEventListener('dragover', handleRouteItemDragOver);
+    routeJobsList.addEventListener('drop', handleRouteItemDrop);
+    routeJobsList.addEventListener('dragenter', handleRouteContainerDragEnter);
+    
+    tickets.forEach((ticket, index) => {
         const scheduledTime = ticket.scheduled_date ? 
             new Date(ticket.scheduled_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 
             'Time TBD';
             
-        return `
-            <div class="route-job-item priority-${ticket.priority || 'medium'}">
-                <div class="job-order">${index + 1}</div>
-                <div class="job-details">
-                    <div>
-                        <span class="job-time">${scheduledTime}</span>
-                        <span class="job-service">${ticket.service_type || 'Service'}</span>
-                        <span class="job-customer">${ticket.customer_name || ticket.job_id}</span>
-                    </div>
-                    <div class="job-address">${ticket.customer_address || 'Address not available'}</div>
+        const jobItem = document.createElement('div');
+        jobItem.className = `route-job-item priority-${ticket.priority || 'medium'}`;
+        jobItem.draggable = true;
+        jobItem.dataset.ticketId = ticket.id;
+        jobItem.dataset.routePosition = index;
+        // Prevent any default tooltips
+        jobItem.title = '';
+        
+        jobItem.innerHTML = `
+            <div class="job-order" draggable="false">${index + 1}</div>
+            <div class="job-details" draggable="false">
+                <div draggable="false">
+                    <span class="job-time" draggable="false">${scheduledTime}</span>
+                    <span class="job-service" draggable="false">${ticket.service_type || 'Service'}</span>
+                    <span class="job-customer" draggable="false">${ticket.customer_name || ticket.job_id}</span>
                 </div>
+                <div class="job-address" draggable="false">${ticket.customer_address || 'Address not available'}</div>
             </div>
         `;
-    }).join('');
+        
+        // Add drag event listeners
+        jobItem.addEventListener('dragstart', handleRouteItemDragStart);
+        jobItem.addEventListener('dragend', handleRouteItemDragEnd);
+        jobItem.addEventListener('dragover', handleRouteItemDragOver);
+        jobItem.addEventListener('drop', handleRouteItemDrop);
+        jobItem.addEventListener('dragenter', e => e.preventDefault());
+        
+        routeJobsList.appendChild(jobItem);
+    });
 }
 
 
@@ -1841,6 +2213,339 @@ function exportRoute() {
         .catch(error => {
             console.error('Error fetching data for export:', error);
             alert('Failed to export route - please try again');
+        });
+}
+
+// Populate sidebar with truck and team information
+function populateSidebarInfo(truckInfo, assignedTeamMember) {
+    // Update truck information
+    document.getElementById('sidebar-truck-name').textContent = truckInfo.truck_number;
+    document.getElementById('truck-make-model').textContent = `${truckInfo.make} ${truckInfo.model}`;
+    
+    // Set capacity with appropriate unit
+    let capacityText = 'Not specified';
+    if (truckInfo.tank_capacity) {
+        capacityText = `${truckInfo.tank_capacity} gallons`;
+    }
+    document.getElementById('truck-capacity-value').textContent = capacityText;
+    
+    // Update team assignment
+    const teamMemberDiv = document.getElementById('assigned-team-member');
+    if (assignedTeamMember && assignedTeamMember.name) {
+        teamMemberDiv.innerHTML = `
+            <div class="team-member-assigned">
+                ${assignedTeamMember.name}
+            </div>
+            <div style="font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem;">
+                Assigned for ${currentDate}
+            </div>
+        `;
+        teamMemberDiv.className = 'team-member-info';
+    } else {
+        teamMemberDiv.innerHTML = `
+            <div class="team-member-unassigned">
+                No team member assigned
+            </div>
+            <div style="font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem;">
+                Click "Team" button to assign
+            </div>
+        `;
+        teamMemberDiv.className = 'team-member-info';
+    }
+}
+
+// Animation functions for smooth card movement
+function animateCardsAfterRemoval(removedCard) {
+    const container = removedCard.closest('.ticket-list');
+    if (!container) return;
+    
+    // Get all cards that come after the removed card
+    const allCards = Array.from(container.children);
+    const removedIndex = allCards.indexOf(removedCard);
+    
+    // Animate cards that will move up to fill the space
+    allCards.slice(removedIndex + 1).forEach((card, index) => {
+        if (card.classList.contains('ticket-card') || card.classList.contains('ticket-card-compact')) {
+            setTimeout(() => {
+                const animClass = card.classList.contains('ticket-card') ? 'ticket-card-animate' : 'ticket-card-compact-animate';
+                card.classList.add(animClass);
+                
+                // Remove animation class after animation completes
+                setTimeout(() => {
+                    card.classList.remove(animClass);
+                }, 200);
+            }, index * 30); // Stagger the animations slightly
+        }
+    });
+}
+
+function animateCardsOnPlaceholder() {
+    // Add subtle animation when placeholder appears
+    const placeholders = document.querySelectorAll('.drop-placeholder');
+    placeholders.forEach(placeholder => {
+        // Get cards after the placeholder
+        const container = placeholder.parentElement;
+        const allElements = Array.from(container.children);
+        const placeholderIndex = allElements.indexOf(placeholder);
+        
+        // Animate cards that come after the placeholder
+        allElements.slice(placeholderIndex + 1).forEach((element, index) => {
+            if (element.classList.contains('ticket-card-compact')) {
+                element.style.transform = 'translateY(2px)';
+                setTimeout(() => {
+                    element.style.transform = '';
+                }, 150);
+            }
+        });
+    });
+}
+
+// Route drag and drop handlers for modal
+let draggedRouteItem = null;
+let routeDropPlaceholder = null;
+
+function handleRouteItemDragStart(e) {
+    draggedRouteItem = e.target.closest('.route-job-item');
+    if (!draggedRouteItem) return;
+    
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedRouteItem.dataset.ticketId);
+    
+    // Hide the original card after a delay (like main board)
+    setTimeout(() => {
+        if (draggedRouteItem) {
+            draggedRouteItem.style.position = 'absolute';
+            draggedRouteItem.style.top = '-9999px';
+            draggedRouteItem.style.left = '-9999px';
+            draggedRouteItem.style.zIndex = '-1';
+            draggedRouteItem.classList.add('dragging');
+            console.log('Hidden route item during drag');
+        }
+    }, 50);
+}
+
+function handleRouteItemDragEnd(e) {
+    if (draggedRouteItem) {
+        // Restore the card
+        draggedRouteItem.style.position = '';
+        draggedRouteItem.style.top = '';
+        draggedRouteItem.style.left = '';
+        draggedRouteItem.style.zIndex = '';
+        draggedRouteItem.classList.remove('dragging');
+        draggedRouteItem = null;
+    }
+    
+    // Remove placeholder
+    removeRoutePlaceholder();
+}
+
+function handleRouteItemDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (!draggedRouteItem) return;
+    
+    const routeJobsList = document.getElementById('route-jobs-list');
+    const visibleItems = [...routeJobsList.querySelectorAll('.route-job-item:not(.dragging)')];
+    const mouseY = e.clientY;
+    
+    // Remove existing placeholder
+    removeRoutePlaceholder();
+    
+    // Find the best position for the placeholder
+    let insertBefore = null;
+    
+    for (let i = 0; i < visibleItems.length; i++) {
+        const item = visibleItems[i];
+        const rect = item.getBoundingClientRect();
+        const itemCenter = rect.top + rect.height / 2;
+        
+        if (mouseY < itemCenter) {
+            insertBefore = item;
+            break;
+        }
+    }
+    
+    // Create new placeholder
+    routeDropPlaceholder = document.createElement('div');
+    routeDropPlaceholder.className = 'route-drop-placeholder';
+    routeDropPlaceholder.textContent = 'Drop job here';
+    
+    if (insertBefore) {
+        routeJobsList.insertBefore(routeDropPlaceholder, insertBefore);
+    } else {
+        routeJobsList.appendChild(routeDropPlaceholder);
+    }
+}
+
+function handleRouteItemDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedRouteItem || !routeDropPlaceholder) return;
+    
+    const routeJobsList = document.getElementById('route-jobs-list');
+    const allChildren = [...routeJobsList.children];
+    const placeholderIndex = allChildren.indexOf(routeDropPlaceholder);
+    const oldPosition = parseInt(draggedRouteItem.dataset.routePosition);
+    
+    // Count route items before the placeholder (excluding the dragged one)
+    // The dragged item is hidden but still in the DOM, so we need to account for this
+    let visualPosition = 0;
+    for (let i = 0; i < placeholderIndex; i++) {
+        const child = allChildren[i];
+        if (child.classList.contains('route-job-item') && child !== draggedRouteItem) {
+            visualPosition++;
+        }
+    }
+    
+    // Use visual position directly - the backend now handles reordering correctly
+    let newPosition = visualPosition;
+    
+    const draggedTicketId = draggedRouteItem.dataset.ticketId;
+    
+    console.log(`\n=== DROP DEBUG ===`);
+    console.log(`Dragged ticket: ${draggedTicketId} (currently at position ${oldPosition})`);
+    console.log(`Direction: ${oldPosition < visualPosition ? 'FORWARD/DOWN' : 'BACKWARD/UP'}`);
+    const draggedIndex = allChildren.indexOf(draggedRouteItem);
+    console.log(`Dragged item DOM index: ${draggedIndex}, Placeholder DOM index: ${placeholderIndex}`);
+    console.log(`Visual position (where placeholder is): ${visualPosition}, New position sent to API: ${newPosition}`);
+    console.log(`All children:`, allChildren.map((child, i) => {
+        if (child === routeDropPlaceholder) return `${i}: [PLACEHOLDER]`;
+        if (child.classList.contains('route-job-item')) {
+            return `${i}: ticket-${child.dataset.ticketId}(pos:${child.dataset.routePosition})${child === draggedRouteItem ? ' [DRAGGED]' : ''}`;
+        }
+        return `${i}: other`;
+    }));
+    
+    // Only update if position actually changed
+    if (oldPosition !== newPosition) {
+        updateRouteOrder(draggedTicketId, newPosition);
+    } else {
+        console.log('Position unchanged, restoring view');
+        // Just refresh to restore the view
+        removeRoutePlaceholder();
+        if (draggedRouteItem) {
+            draggedRouteItem.style.position = '';
+            draggedRouteItem.style.top = '';
+            draggedRouteItem.style.left = '';
+            draggedRouteItem.style.zIndex = '';
+            draggedRouteItem.classList.remove('dragging');
+        }
+    }
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.route-job-item:not(.dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function removeRoutePlaceholder() {
+    if (routeDropPlaceholder) {
+        routeDropPlaceholder.remove();
+        routeDropPlaceholder = null;
+    }
+}
+
+function handleRouteContainerDragEnter(e) {
+    e.preventDefault();
+}
+
+function updateRouteOrder(ticketId, newPosition) {
+    if (!currentMapTruckId) {
+        console.error('No current truck ID for route update');
+        return;
+    }
+    
+    // Get all current route items to calculate proper positions
+    const routeJobsList = document.getElementById('route-jobs-list');
+    const allItems = [...routeJobsList.querySelectorAll('.route-job-item:not(.dragging)')];
+    
+    // Find the dragged item's current position
+    const oldPosition = parseInt(draggedRouteItem.dataset.routePosition);
+    
+    console.log(`Moving ticket ${ticketId} from position ${oldPosition} to position ${newPosition}`);
+    
+    // We need to reorder all tickets in the truck
+    const reorderData = {
+        ticket_id: ticketId,
+        truck_id: currentMapTruckId,
+        route_position: newPosition,
+        scheduled_date: new Date(currentDate + 'T09:00:00').toISOString()
+    };
+    
+    fetch('/api/tickets/reorder-route', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reorderData)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            console.log('Route order updated successfully');
+            // Refresh the map with updated data
+            refreshMapData();
+            // Also refresh the main job board
+            loadJobBoard();
+        } else {
+            console.error('Route update error:', result.error);
+            // Refresh anyway to restore the original order
+            refreshMapData();
+        }
+    })
+    .catch(error => {
+        console.error('Error updating route order:', error);
+        // Refresh to restore original order
+        refreshMapData();
+    });
+}
+
+function refreshMapData() {
+    if (!currentMapTruckId) return;
+    
+    // Fetch updated data and refresh the map
+    fetch(`/api/job-board?date=${currentDate}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update global trucks array if needed
+            if (data.trucks) {
+                trucks = data.trucks;
+            }
+            
+            const truckInfo = trucks.find(t => t.id == currentMapTruckId);
+            if (!truckInfo) {
+                console.error('Truck not found:', currentMapTruckId);
+                return;
+            }
+            
+            const assignedTeamMember = teamAssignments[currentMapTruckId];
+            const truckTickets = data.truck_schedules[currentMapTruckId] || [];
+            
+            console.log('Refreshing map with updated data:', truckTickets.length, 'tickets');
+            
+            // Re-initialize the map with fresh data
+            initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets);
+        })
+        .catch(error => {
+            console.error('Error refreshing map data:', error);
+            // Don't show alert, just log the error
         });
 }
 

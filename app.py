@@ -40,6 +40,10 @@ def job_board():
     team_members = TeamMember.query.filter_by(employment_status='active').all()
     return render_template('job_board.html', trucks=trucks, team_members=team_members)
 
+@app.route('/job-board-new')
+def job_board_new():
+    return render_template('job_board_new.html')
+
 @app.route('/database')
 def database_view():
     tickets = Ticket.query.all()
@@ -192,7 +196,9 @@ def get_job_board_data():
     truck_schedules = {}
     for truck in trucks:
         truck_tickets = [t for t in scheduled_tickets if t.truck_id == truck.id]
-        truck_tickets.sort(key=lambda x: x.route_position or 999)  # Sort by route position
+        print(f"🚛 Before sort - Truck {truck.id}: {[(t.id, t.route_position) for t in truck_tickets]}")
+        truck_tickets.sort(key=lambda x: x.route_position if x.route_position is not None else 999)  # Sort by route position
+        print(f"🚛 After sort - Truck {truck.id}: {[(t.id, t.route_position) for t in truck_tickets]}")
         truck_schedules[str(truck.id)] = [ticket.to_dict() for ticket in truck_tickets]
     
     # Get team assignments for the target date
@@ -432,48 +438,36 @@ def reorder_tickets():
         new_status = data.get('new_status')
         new_position = data.get('new_position', 0)
         
+        # Ensure ticket_id is an integer for comparison
+        ticket_id = int(ticket_id)
+        
         # Get the ticket being moved
         ticket = Ticket.query.get_or_404(ticket_id)
         old_status = ticket.status
         old_position = ticket.column_position
         
-        # If moving to a different column, update all positions in both columns
-        if old_status != new_status:
-            # Decrement positions in old column for tickets below the moved ticket
-            Ticket.query.filter(
-                Ticket.status == old_status,
-                Ticket.column_position > old_position
-            ).update({Ticket.column_position: Ticket.column_position - 1})
+        print(f"Column reorder: ticket {ticket_id} from {old_status}:{old_position} to {new_status}:{new_position}")
+        
+        # Get all tickets in the target status/column, ordered by column_position
+        all_column_tickets = Ticket.query.filter(
+            Ticket.status == new_status
+        ).order_by(Ticket.column_position).all()
+        
+        # Remove the ticket from its current position
+        tickets_without_moved = [t for t in all_column_tickets if t.id != ticket_id]
+        
+        # Create the final ordered list by inserting the moved ticket at the new position
+        final_positions = tickets_without_moved.copy()
+        final_positions.insert(new_position, ticket)
+        
+        # Update the ticket's status
+        ticket.status = new_status
+        
+        # Assign sequential column_position values (0, 1, 2, etc.)
+        for i, t in enumerate(final_positions):
+            t.column_position = i
             
-            # Increment positions in new column for tickets at or above the new position
-            Ticket.query.filter(
-                Ticket.status == new_status,
-                Ticket.column_position >= new_position
-            ).update({Ticket.column_position: Ticket.column_position + 1})
-            
-            # Update the ticket's status and position
-            ticket.status = new_status
-            ticket.column_position = new_position
-            
-        else:
-            # Moving within the same column
-            if new_position > old_position:
-                # Moving down: decrement positions of tickets between old and new position
-                Ticket.query.filter(
-                    Ticket.status == new_status,
-                    Ticket.column_position > old_position,
-                    Ticket.column_position <= new_position
-                ).update({Ticket.column_position: Ticket.column_position - 1})
-            elif new_position < old_position:
-                # Moving up: increment positions of tickets between new and old position
-                Ticket.query.filter(
-                    Ticket.status == new_status,
-                    Ticket.column_position >= new_position,
-                    Ticket.column_position < old_position
-                ).update({Ticket.column_position: Ticket.column_position + 1})
-            
-            # Update the ticket's position
-            ticket.column_position = new_position
+        print(f"Column reorder complete: ticket {ticket_id} now at {new_status}:{ticket.column_position}")
         
         db.session.commit()
         return jsonify({'success': True, 'ticket': ticket.to_dict()})
@@ -493,25 +487,39 @@ def reorder_route():
         new_position = data.get('route_position', 0)
         scheduled_date = data.get('scheduled_date')
         
+        print(f"Backend received: ticket_id={ticket_id}, new_position={new_position}")
+        
+        # Ensure ticket_id is an integer for comparison
+        ticket_id = int(ticket_id)
+        
         ticket = Ticket.query.get_or_404(ticket_id)
         
-        # Get all tickets for this truck on this date
+        # Get all tickets for this truck on this date (including the one being moved)
         target_date = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00')).date()
-        truck_tickets = Ticket.query.filter(
+        all_truck_tickets = Ticket.query.filter(
             Ticket.truck_id == truck_id,
-            db.func.date(Ticket.scheduled_date) == target_date,
-            Ticket.id != ticket_id
+            db.func.date(Ticket.scheduled_date) == target_date
         ).order_by(Ticket.route_position).all()
         
-        # Adjust positions of other tickets
-        for i, other_ticket in enumerate(truck_tickets):
-            if i >= new_position:
-                other_ticket.route_position = i + 1
-            else:
-                other_ticket.route_position = i
+        # Get the old position of the ticket being moved
+        old_position = ticket.route_position
+        print(f"Old position: {old_position}, New position: {new_position}")
         
-        # Update the moved ticket
-        ticket.route_position = new_position
+        # Remove the ticket from its current position and reorder
+        tickets_without_moved = [t for t in all_truck_tickets if t.id != ticket_id]
+        print(f"Total tickets: {len(all_truck_tickets)}, Without moved: {len(tickets_without_moved)}")
+        
+        # Create the final ordered list by inserting the moved ticket at the new position
+        final_positions = tickets_without_moved.copy()
+        final_positions.insert(new_position, ticket)
+        
+        # Assign sequential route_position values (0, 1, 2, etc.)
+        for i, t in enumerate(final_positions):
+            t.route_position = i
+            print(f"Setting ticket {t.id} to route_position {i}")
+            
+        print(f"Moved ticket {ticket.id} from position {old_position} to position {new_position}")
+        print(f"Final positions: {[(t.id, t.route_position) for t in final_positions]}")
         
         db.session.commit()
         return jsonify({'success': True, 'ticket': ticket.to_dict()})
@@ -1369,14 +1377,61 @@ def delete_team_member_api(member_id):
 def health():
     return {'status': 'healthy', 'service': 'TrueTank'}
 
-# Create database tables
-with app.app_context():
-    db.create_all()
-    
-    # Add sample data if database is empty
-    # First create locations, trucks, and team members, then customers and tickets
-    if Location.query.count() == 0:
-        # Create sample locations first
+@app.route('/admin/init-database', methods=['POST'])
+def init_database_endpoint():
+    """Initialize database tables via web endpoint"""
+    try:
+        db.create_all()
+        return jsonify({'success': True, 'message': 'Database tables created successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/import-sample-data', methods=['POST'])
+def import_sample_data_endpoint():
+    """Import sample data via web endpoint"""
+    try:
+        # First ensure tables exist
+        db.create_all()
+        
+        from import_sample_data import import_data
+        
+        # Use the latest sample data file
+        filename = 'sample_data_export_20250711_084627.json'
+        success = import_data(filename)
+        
+        if success:
+            return jsonify({
+                'success': True, 
+                'message': 'Sample data imported successfully',
+                'records': {
+                    'locations': 4,
+                    'team_members': 4,
+                    'trucks': 4,
+                    'customers': 25,
+                    'septic_systems': 18,
+                    'tickets': 39
+                }
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Import failed'}), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def init_database():
+    """Initialize database tables"""
+    with app.app_context():
+        try:
+            # Test connection first
+            db.engine.execute('SELECT 1')
+            db.create_all()
+            print("✅ Database tables created successfully")
+        except Exception as e:
+            print(f"❌ Database initialization error: {e}")
+            print("⚠️  App will continue without database initialization")
+
+# Legacy sample data creation (commented out to avoid import issues)
+"""
         locations = [
             Location(
                 name='Main Office',
@@ -1788,6 +1843,7 @@ with app.app_context():
             db.session.add(ticket)
         
         db.session.commit()
+"""
 
 # AI Septic Estimator API
 @app.route('/api/property-lookup', methods=['POST'])
@@ -2150,6 +2206,148 @@ def save_team_assignment():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# ============================================================================
+# NEW JOB BOARD API (Clean rebuild)
+# ============================================================================
+
+@app.route('/api/job-board/tickets', methods=['GET'])
+def get_job_board_tickets():
+    """Get all tickets organized by status for the kanban board"""
+    try:
+        # Define the status columns we want to show
+        statuses = ['pending', 'assigned', 'in-progress', 'completed']
+        
+        result = {}
+        
+        for status in statuses:
+            # Get tickets for this status, ordered by column_position
+            tickets = Ticket.query.filter(
+                Ticket.status == status
+            ).order_by(Ticket.column_position.asc().nullslast()).all()
+            
+            # Convert to dict format
+            result[status] = [ticket.to_dict() for ticket in tickets]
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/job-board/move', methods=['POST'])
+def move_job_board_ticket():
+    """Move a ticket to a new status and position"""
+    try:
+        data = request.get_json()
+        
+        ticket_id = int(data.get('ticket_id'))
+        new_status = data.get('new_status')
+        new_position = int(data.get('new_position', 0))
+        
+        print(f"Job Board Move: ticket {ticket_id} to {new_status} at position {new_position}")
+        
+        # Get the ticket being moved
+        ticket = Ticket.query.get_or_404(ticket_id)
+        
+        # Get all tickets in the target status, ordered by column_position
+        all_status_tickets = Ticket.query.filter(
+            Ticket.status == new_status
+        ).order_by(Ticket.column_position.asc().nullslast()).all()
+        
+        # Remove the moved ticket from the list (if it was already in this status)
+        tickets_without_moved = [t for t in all_status_tickets if t.id != ticket_id]
+        
+        # Create the final ordered list by inserting the moved ticket at the new position
+        final_positions = tickets_without_moved.copy()
+        final_positions.insert(new_position, ticket)
+        
+        # Update the ticket's status
+        ticket.status = new_status
+        
+        # Assign sequential column_position values (0, 1, 2, etc.)
+        for i, t in enumerate(final_positions):
+            t.column_position = i
+            
+        print(f"Job Board Move Complete: ticket {ticket_id} now at {new_status}:{ticket.column_position}")
+        
+        db.session.commit()
+        return jsonify({'success': True, 'ticket': ticket.to_dict()})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in move_job_board_ticket: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/job-board/create', methods=['POST'])
+def create_job_board_ticket():
+    """Create a new ticket for the job board"""
+    try:
+        data = request.get_json()
+        
+        # Generate next job ID
+        latest_ticket = Ticket.query.order_by(Ticket.id.desc()).first()
+        if latest_ticket and latest_ticket.job_id.startswith('TT'):
+            latest_num = int(latest_ticket.job_id[2:])
+            next_num = latest_num + 1
+        else:
+            next_num = 1
+        
+        job_id = f"TT{str(next_num).zfill(8)}"
+        
+        # Create new ticket
+        ticket = Ticket(
+            job_id=job_id,
+            customer_name=data.get('customer_name', '[New Customer]'),
+            service_type=data.get('service_type', 'Septic Service'),
+            status='pending',
+            priority=data.get('priority', 'medium'),
+            service_description=data.get('description', 'New septic service job'),
+            column_position=0  # Always add at top of pending column
+        )
+        
+        # Shift other pending tickets down
+        Ticket.query.filter(Ticket.status == 'pending').update(
+            {Ticket.column_position: Ticket.column_position + 1}
+        )
+        
+        db.session.add(ticket)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'ticket': ticket.to_dict()})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating ticket: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/job-board/tickets/<int:ticket_id>', methods=['DELETE'])
+def delete_job_board_ticket(ticket_id):
+    """Delete a ticket from the job board"""
+    try:
+        ticket = Ticket.query.get_or_404(ticket_id)
+        old_status = ticket.status
+        old_position = ticket.column_position
+        
+        # Delete the ticket
+        db.session.delete(ticket)
+        
+        # Shift remaining tickets in the same status up to fill the gap
+        if old_position is not None:
+            Ticket.query.filter(
+                Ticket.status == old_status,
+                Ticket.column_position > old_position
+            ).update({Ticket.column_position: Ticket.column_position - 1})
+        
+        db.session.commit()
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting ticket: {e}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
+    # Initialize database when app starts (commented out during debugging)
+    # init_database()
+    
     port = int(os.environ.get('PORT', 5555))
     app.run(debug=True, host='0.0.0.0', port=port)

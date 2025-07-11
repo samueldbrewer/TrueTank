@@ -253,6 +253,7 @@ class Ticket(db.Model):
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
             'requested_service_date': self.requested_service_date.isoformat() if self.requested_service_date else None,
             'estimated_duration': self.estimated_duration,
+            'route_position': self.route_position,
             'column_position': self.column_position,
             'assigned_technician': self.assigned_technician,
             'assigned_crew': self.assigned_crew,
