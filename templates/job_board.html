@@ -475,21 +475,37 @@
     margin: 1rem 0;
 }
 
-/* Drag and Drop Enhancements */
+/* Mouse-Following Drag and Drop Styles */
 .ticket-list.drag-over {
-    background-color: rgba(52, 152, 219, 0.1);
+    background-color: rgba(52, 152, 219, 0.08);
     border: 2px dashed #3498db;
     border-radius: 6px;
     transition: all 0.2s ease;
 }
 
-.ticket-card.dragging,
-.ticket-card-compact.dragging {
-    opacity: 0.6;
-    transform: rotate(2deg) scale(0.95);
+/* Mouse follower - the card that sticks to cursor */
+.drag-follower {
+    background: white !important;
+    border: 2px solid #3498db !important;
+    cursor: grabbing !important;
+    transition: none !important;
+}
+
+/* Ghost preview - the duplicate showing drop position */
+.ghost-preview {
+    animation: ghost-pulse 0.8s ease-in-out infinite;
     transition: all 0.2s ease;
-    z-index: 1000;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+@keyframes ghost-pulse {
+    0%, 100% { 
+        opacity: 0.4;
+        transform: scale(0.98);
+    }
+    50% { 
+        opacity: 0.7;
+        transform: scale(1.01);
+    }
 }
 
 /* Compact Ticket Cards for Truck Columns */
@@ -1084,22 +1100,73 @@ function updatePendingCount(count) {
     document.getElementById('pending-count').textContent = count;
 }
 
-// Drag and Drop Functions
-let draggedTicket = null;
-let targetPosition = null;
+// Mouse-Following Drag and Drop with Ghost Preview
+let draggedElement = null;
+let dragFollower = null;
+let ghostElement = null;
+let currentDropTarget = null;
 
 function handleDragStart(e) {
-    draggedTicket = e.target;
-    e.target.classList.add('dragging');
+    draggedElement = e.target.closest('.ticket-card, .ticket-card-compact');
+    if (!draggedElement) return;
+    
+    // Create the mouse follower (actual card that follows cursor)
+    createMouseFollower(draggedElement);
+    
+    // Completely hide the original element so others move up to fill space
+    draggedElement.style.display = 'none';
+    
+    // Set up drag data
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ''); // Required for some browsers
+}
+
+function createMouseFollower(originalElement) {
+    // Create a clone that will follow the mouse
+    dragFollower = originalElement.cloneNode(true);
+    dragFollower.classList.add('drag-follower');
+    dragFollower.style.position = 'fixed';
+    dragFollower.style.pointerEvents = 'none';
+    dragFollower.style.zIndex = '9999';
+    dragFollower.style.transform = 'rotate(-2deg) scale(1.05)';
+    dragFollower.style.boxShadow = '0 8px 20px rgba(0,0,0,0.25)';
+    dragFollower.style.opacity = '0.95';
+    
+    document.body.appendChild(dragFollower);
+    
+    // Position it at the mouse cursor initially
+    document.addEventListener('dragover', updateMouseFollowerPosition);
+}
+
+function updateMouseFollowerPosition(e) {
+    if (dragFollower) {
+        // Offset the follower so it doesn't interfere with drag events
+        dragFollower.style.left = (e.clientX + 10) + 'px';
+        dragFollower.style.top = (e.clientY + 10) + 'px';
+    }
 }
 
 function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    draggedTicket = null;
-    targetPosition = null;
+    // Clean up everything
+    if (draggedElement) {
+        draggedElement.style.display = '';
+        draggedElement = null;
+    }
     
-    // Remove drag-over class from all lists
+    if (dragFollower) {
+        dragFollower.remove();
+        dragFollower = null;
+        document.removeEventListener('dragover', updateMouseFollowerPosition);
+    }
+    
+    if (ghostElement) {
+        ghostElement.remove();
+        ghostElement = null;
+    }
+    
+    currentDropTarget = null;
+    
+    // Clean up visual feedback
     document.querySelectorAll('.ticket-list').forEach(list => {
         list.classList.remove('drag-over');
     });
@@ -1109,93 +1176,124 @@ function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    const ticketList = e.target.closest('.ticket-list');
-    if (!ticketList) return;
+    if (!draggedElement) return;
     
-    const pendingColumn = ticketList.closest('.pending-column');
-    const sourcePendingColumn = draggedTicket?.closest('.pending-column');
-    
-    // Remove drag-over from all other lists
-    document.querySelectorAll('.ticket-list').forEach(list => {
-        if (list !== ticketList) {
-            list.classList.remove('drag-over');
-        }
-    });
-    
-    // Don't show drag-over effects when trying to reorder within pending column
-    if (pendingColumn && sourcePendingColumn) {
-        return; // Don't show any drag feedback for pending-to-pending
+    const targetList = e.target.closest('.ticket-list');
+    if (!targetList) {
+        removeGhostElement();
+        return;
     }
     
-    // Add drag-over visual feedback to current list
-    ticketList.classList.add('drag-over');
+    const truckColumn = targetList.closest('.truck-column');
+    const pendingColumn = targetList.closest('.pending-column');
+    const sourceIsPending = draggedElement.closest('.pending-column');
     
-    // Calculate drop position
-    updateTargetPosition(e, ticketList);
+    // Don't allow reordering within pending column
+    if (pendingColumn && sourceIsPending) {
+        removeGhostElement();
+        return;
+    }
+    
+    // Show visual feedback for valid drop zones
+    document.querySelectorAll('.ticket-list').forEach(list => {
+        list.classList.remove('drag-over');
+    });
+    targetList.classList.add('drag-over');
+    
+    // Show ghost element in truck columns
+    if (truckColumn) {
+        showGhostElement(e, targetList);
+    } else {
+        removeGhostElement();
+    }
 }
 
-function updateTargetPosition(e, ticketList) {
-    // Select both regular and compact ticket cards, excluding the dragging one
-    const tickets = Array.from(ticketList.querySelectorAll('.ticket-card:not(.dragging), .ticket-card-compact:not(.dragging)'));
-    let insertPosition = 0;
+function showGhostElement(e, targetList) {
+    const tickets = Array.from(targetList.querySelectorAll('.ticket-card-compact:not(.dragging)'));
+    const mouseY = e.clientY;
     
-    // Get the mouse position relative to the ticket list
-    const listRect = ticketList.getBoundingClientRect();
-    const relativeY = e.clientY - listRect.top;
+    let insertIndex = 0;
+    let insertBeforeElement = null;
     
-    // Find where to position the dropped ticket
+    // Find the correct insertion point
     for (let i = 0; i < tickets.length; i++) {
-        const ticketRect = tickets[i].getBoundingClientRect();
-        const ticketTop = ticketRect.top - listRect.top;
-        const ticketMiddle = ticketTop + (ticketRect.height / 2);
+        const ticket = tickets[i];
+        const rect = ticket.getBoundingClientRect();
+        const ticketMiddle = rect.top + rect.height / 2;
         
-        if (relativeY <= ticketMiddle) {
-            insertPosition = i;
+        if (mouseY < ticketMiddle) {
+            insertIndex = i;
+            insertBeforeElement = ticket;
             break;
         } else {
-            insertPosition = i + 1;
+            insertIndex = i + 1;
         }
     }
     
-    targetPosition = insertPosition;
+    // Create or update ghost element
+    if (!ghostElement || currentDropTarget !== targetList) {
+        removeGhostElement();
+        
+        // Create ghost duplicate of the dragged element
+        ghostElement = draggedElement.cloneNode(true);
+        ghostElement.classList.add('ghost-preview');
+        ghostElement.style.opacity = '0.6';
+        ghostElement.style.border = '2px dashed #3498db';
+        ghostElement.style.background = 'rgba(52, 152, 219, 0.1)';
+        ghostElement.style.pointerEvents = 'none';
+        
+        currentDropTarget = targetList;
+    }
+    
+    // Position the ghost element
+    if (insertBeforeElement) {
+        targetList.insertBefore(ghostElement, insertBeforeElement);
+    } else {
+        targetList.appendChild(ghostElement);
+    }
+    
+    // Store the insertion index for the drop handler
+    targetList.dataset.dropIndex = insertIndex;
+}
+
+function removeGhostElement() {
+    if (ghostElement) {
+        ghostElement.remove();
+        ghostElement = null;
+    }
+    currentDropTarget = null;
 }
 
 function handleDrop(e) {
     e.preventDefault();
     
-    if (!draggedTicket || targetPosition === null) return;
+    if (!draggedElement) return;
     
-    const truckColumn = e.target.closest('.truck-column');
-    const pendingColumn = e.target.closest('.pending-column');
-    const ticketList = truckColumn ? truckColumn.querySelector('.ticket-list') : 
-                      pendingColumn ? pendingColumn.querySelector('.ticket-list') : null;
+    const targetList = e.target.closest('.ticket-list');
+    if (!targetList) return;
     
-    if (truckColumn && ticketList) {
+    const truckColumn = targetList.closest('.truck-column');
+    const pendingColumn = targetList.closest('.pending-column');
+    const sourceIsPending = draggedElement.closest('.pending-column');
+    const sourceTruckColumn = draggedElement.closest('.truck-column');
+    
+    const ticketId = draggedElement.dataset.ticketId;
+    
+    if (truckColumn) {
         const truckId = truckColumn.dataset.truckId;
-        const ticketId = draggedTicket.dataset.ticketId;
-        const sourceTruckId = draggedTicket.closest('.truck-column')?.dataset.truckId;
-        const sourcePendingColumn = draggedTicket.closest('.pending-column');
+        const sourceTruckId = sourceTruckColumn?.dataset.truckId;
+        const dropIndex = parseInt(targetList.dataset.dropIndex || '0');
         
-        // Use the calculated targetPosition
-        const routePosition = targetPosition;
-        
-        // If moving within the same truck, handle reordering
         if (sourceTruckId === truckId) {
-            reorderTicketInTruck(ticketId, truckId, routePosition);
+            // Reordering within same truck
+            reorderTicketInTruck(ticketId, truckId, dropIndex);
         } else {
-            // Assign ticket to different truck (from pending or different truck)
-            assignTicketToTruck(ticketId, truckId, routePosition);
+            // Moving from pending or different truck
+            assignTicketToTruck(ticketId, truckId, dropIndex);
         }
-    } else if (pendingColumn) {
-        const sourcePendingColumn = draggedTicket.closest('.pending-column');
-        
-        // Only allow dropping tickets back to pending from trucks, not reordering within pending
-        if (!sourcePendingColumn) {
-            // Move ticket back to pending from a truck
-            const ticketId = draggedTicket.dataset.ticketId;
-            moveTicketToPending(ticketId);
-        }
-        // If source is pending column, ignore the drop (no reordering in pending)
+    } else if (pendingColumn && !sourceIsPending) {
+        // Moving back to pending from a truck
+        moveTicketToPending(ticketId);
     }
 }
 
