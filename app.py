@@ -20,11 +20,16 @@ app = Flask(__name__)
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///truetank.db')
+print(f"Original DATABASE_URL: {database_url[:50]}..." if len(database_url) > 50 else f"Original DATABASE_URL: {database_url}")
+
 # Fix PostgreSQL URL format for newer SQLAlchemy versions
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    print(f"Fixed DATABASE_URL: {database_url[:50]}..." if len(database_url) > 50 else f"Fixed DATABASE_URL: {database_url}")
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+print(f"SQLAlchemy URI configured successfully")
 
 # Development vs Production configuration
 if os.environ.get('FLASK_ENV') == 'development':
@@ -33,7 +38,16 @@ else:
     app.config['DEBUG'] = False
 
 # Initialize database
-db.init_app(app)
+try:
+    print("Initializing database...")
+    db.init_app(app)
+    print("Database initialized successfully")
+except Exception as e:
+    print(f"Database initialization error: {e}")
+    print(f"Error type: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
+    raise
 
 # OpenRouteService configuration
 OPENROUTE_API_KEY = os.environ.get('OPENROUTE_API_KEY')
