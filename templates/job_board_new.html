@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrueTank Job Board</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f7fa;
+            color: #2c3e50;
+        }
+
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #e1e8ed;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .job-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            height: calc(100vh - 100px);
+        }
+
+        .column {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .column-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e1e8ed;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .column-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .column-count {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .column-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+
+        .ticket-card {
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: move;
+            transition: all 0.2s ease;
+            position: relative;
+            border-left: 4px solid #3498db;
+        }
+
+        .ticket-card:hover {
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+        }
+
+        .ticket-card.dragging {
+            opacity: 0.6;
+            transform: rotate(3deg);
+            z-index: 1000;
+        }
+
+        .ticket-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .ticket-id {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9rem;
+        }
+
+        .priority-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .priority-urgent {
+            background: #fee;
+            color: #dc3545;
+            border-left-color: #dc3545;
+        }
+
+        .priority-high {
+            background: #fff3cd;
+            color: #f57c00;
+            border-left-color: #f57c00;
+        }
+
+        .priority-medium {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left-color: #1976d2;
+        }
+
+        .priority-low {
+            background: #f1f8e9;
+            color: #689f38;
+            border-left-color: #689f38;
+        }
+
+        .ticket-customer {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-service {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .ticket-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .detail-label {
+            font-weight: 500;
+            margin-bottom: 0.1rem;
+        }
+
+        .detail-value {
+            color: #2c3e50;
+        }
+
+        .column.drag-over {
+            background: #e8f4ff;
+            border: 2px dashed #3498db;
+        }
+
+        .drop-placeholder {
+            height: 80px;
+            background: #e8f4ff;
+            border: 2px dashed #3498db;
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3498db;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .drop-placeholder.show {
+            opacity: 1;
+        }
+
+        .add-ticket-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 1rem;
+            transition: background 0.2s ease;
+        }
+
+        .add-ticket-btn:hover {
+            background: #218838;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: #6c757d;
+        }
+
+        /* Status-specific column headers */
+        .column[data-status="pending"] .column-header {
+            background: #fff3cd;
+            border-color: #f57c00;
+        }
+
+        .column[data-status="assigned"] .column-header {
+            background: #e3f2fd;
+            border-color: #1976d2;
+        }
+
+        .column[data-status="in-progress"] .column-header {
+            background: #f3e5f5;
+            border-color: #7b1fa2;
+        }
+
+        .column[data-status="completed"] .column-header {
+            background: #f1f8e9;
+            border-color: #689f38;
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .job-board {
+                grid-template-columns: repeat(2, 1fr);
+                height: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .job-board {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TrueTank Job Board</h1>
+    </div>
+
+    <div class="job-board" id="job-board">
+        <div class="column" data-status="pending">
+            <div class="column-header">
+                <div class="column-title">Pending</div>
+                <div class="column-count" id="pending-count">0 tickets</div>
+            </div>
+            <div class="column-content" id="pending-column">
+                <div class="loading">Loading tickets...</div>
+            </div>
+            <button class="add-ticket-btn" onclick="createNewTicket()">+ Add Ticket</button>
+        </div>
+
+        <div class="column" data-status="assigned">
+            <div class="column-header">
+                <div class="column-title">Assigned</div>
+                <div class="column-count" id="assigned-count">0 tickets</div>
+            </div>
+            <div class="column-content" id="assigned-column">
+                <div class="loading">Loading tickets...</div>
+            </div>
+        </div>
+
+        <div class="column" data-status="in-progress">
+            <div class="column-header">
+                <div class="column-title">In Progress</div>
+                <div class="column-count" id="in-progress-count">0 tickets</div>
+            </div>
+            <div class="column-content" id="in-progress-column">
+                <div class="loading">Loading tickets...</div>
+            </div>
+        </div>
+
+        <div class="column" data-status="completed">
+            <div class="column-header">
+                <div class="column-title">Completed</div>
+                <div class="column-count" id="completed-count">0 tickets</div>
+            </div>
+            <div class="column-content" id="completed-column">
+                <div class="loading">Loading tickets...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let draggedElement = null;
+        let draggedTicketId = null;
+        let placeholderElement = null;
+
+        // Initialize the job board when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadJobBoard();
+            initializeDragAndDrop();
+        });
+
+        // Load all tickets from API
+        async function loadJobBoard() {
+            try {
+                const response = await fetch('/api/job-board/tickets');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Loaded job board data:', data);
+                
+                // Clear loading messages
+                document.querySelectorAll('.loading').forEach(el => el.remove());
+                
+                // Populate each column
+                const statuses = ['pending', 'assigned', 'in-progress', 'completed'];
+                statuses.forEach(status => {
+                    const tickets = data[status] || [];
+                    populateColumn(status, tickets);
+                    updateColumnCount(status, tickets.length);
+                });
+                
+            } catch (error) {
+                console.error('Error loading job board:', error);
+                // Show error message in each column
+                document.querySelectorAll('.loading').forEach(el => {
+                    el.textContent = 'Error loading tickets';
+                    el.style.color = '#dc3545';
+                });
+            }
+        }
+
+        // Populate a column with tickets
+        function populateColumn(status, tickets) {
+            const column = document.getElementById(`${status}-column`);
+            
+            // Clear existing content
+            column.innerHTML = '';
+            
+            // Add tickets
+            tickets.forEach(ticket => {
+                const ticketElement = createTicketElement(ticket);
+                column.appendChild(ticketElement);
+            });
+        }
+
+        // Create a ticket card element
+        function createTicketElement(ticket) {
+            const card = document.createElement('div');
+            card.className = `ticket-card priority-${ticket.priority}`;
+            card.draggable = true;
+            card.dataset.ticketId = ticket.id;
+            
+            const customerName = ticket.customer_name || '[No Customer]';
+            const serviceType = ticket.service_type || 'Septic Service';
+            const assignedTech = ticket.assigned_technician || 'Unassigned';
+            const estimatedCost = ticket.estimated_cost ? `$${ticket.estimated_cost.toFixed(2)}` : 'TBD';
+            
+            card.innerHTML = `
+                <div class="ticket-header">
+                    <div class="ticket-id">${ticket.job_id}</div>
+                    <div class="priority-badge priority-${ticket.priority}">${ticket.priority}</div>
+                </div>
+                <div class="ticket-customer">${customerName}</div>
+                <div class="ticket-service">${serviceType}</div>
+                <div class="ticket-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Technician</div>
+                        <div class="detail-value">${assignedTech}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Estimate</div>
+                        <div class="detail-value">${estimatedCost}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Add drag event listeners
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+            
+            return card;
+        }
+
+        // Update column count display
+        function updateColumnCount(status, count) {
+            const countElement = document.getElementById(`${status}-count`);
+            if (countElement) {
+                countElement.textContent = `${count} ticket${count !== 1 ? 's' : ''}`;
+            }
+        }
+
+        // Initialize drag and drop functionality
+        function initializeDragAndDrop() {
+            const columns = document.querySelectorAll('.column-content');
+            
+            columns.forEach(column => {
+                column.addEventListener('dragover', handleDragOver);
+                column.addEventListener('dragenter', handleDragEnter);
+                column.addEventListener('dragleave', handleDragLeave);
+                column.addEventListener('drop', handleDrop);
+            });
+        }
+
+        // Drag event handlers
+        function handleDragStart(e) {
+            draggedElement = e.target;
+            draggedTicketId = e.target.dataset.ticketId;
+            
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', e.target.outerHTML);
+            
+            console.log('Drag started:', draggedTicketId);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            
+            // Remove any placeholder elements
+            if (placeholderElement) {
+                placeholderElement.remove();
+                placeholderElement = null;
+            }
+            
+            // Remove drag-over class from all columns
+            document.querySelectorAll('.column').forEach(col => {
+                col.classList.remove('drag-over');
+            });
+            
+            draggedElement = null;
+            draggedTicketId = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            // Calculate drop position and show placeholder
+            const afterElement = getDragAfterElement(e.currentTarget, e.clientY);
+            
+            // Remove existing placeholder
+            if (placeholderElement) {
+                placeholderElement.remove();
+            }
+            
+            // Create new placeholder
+            placeholderElement = document.createElement('div');
+            placeholderElement.className = 'drop-placeholder show';
+            placeholderElement.textContent = 'Drop here';
+            
+            if (afterElement == null) {
+                e.currentTarget.appendChild(placeholderElement);
+            } else {
+                e.currentTarget.insertBefore(placeholderElement, afterElement);
+            }
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            const column = e.target.closest('.column');
+            if (column) {
+                column.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            // Only remove drag-over if we're leaving the column entirely
+            if (!e.currentTarget.contains(e.relatedTarget)) {
+                const column = e.target.closest('.column');
+                if (column) {
+                    column.classList.remove('drag-over');
+                }
+                
+                // Remove placeholder if we leave the column
+                if (placeholderElement) {
+                    placeholderElement.remove();
+                    placeholderElement = null;
+                }
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            
+            if (!draggedTicketId) return;
+            
+            const targetColumn = e.currentTarget;
+            const newStatus = targetColumn.closest('.column').dataset.status;
+            
+            // Calculate new position based on placeholder location
+            let newPosition = 0;
+            if (placeholderElement) {
+                // Count only ticket cards before the placeholder
+                const allChildren = Array.from(targetColumn.children);
+                const placeholderIndex = allChildren.indexOf(placeholderElement);
+                
+                // Count ticket cards before the placeholder position (excluding the dragged one)
+                newPosition = 0;
+                for (let i = 0; i < placeholderIndex; i++) {
+                    if (allChildren[i].classList.contains('ticket-card') && 
+                        allChildren[i].dataset.ticketId !== draggedTicketId) {
+                        newPosition++;
+                    }
+                }
+            }
+            
+            console.log(`=== DRAG DROP DEBUG ===`);
+            console.log(`Dropping ticket ${draggedTicketId} at ${newStatus}:${newPosition}`);
+            console.log(`Placeholder was at DOM index: ${placeholderElement ? Array.from(targetColumn.children).indexOf(placeholderElement) : 'none'}`);
+            console.log(`Target column children:`, Array.from(targetColumn.children).map(c => `${c.tagName}.${c.className} ${c.dataset.ticketId ? `(ticket-${c.dataset.ticketId})` : ''}`));
+            console.log(`Current tickets in target column:`, Array.from(targetColumn.querySelectorAll('.ticket-card')).map(c => `ticket-${c.dataset.ticketId}`));
+            console.log(`======================`);
+            
+            // Move ticket via API
+            moveTicket(draggedTicketId, newStatus, newPosition);
+        }
+
+        // Calculate which element the dragged item should be inserted after
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.ticket-card:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // Move ticket via API
+        async function moveTicket(ticketId, newStatus, newPosition) {
+            console.log(`🚀 API Call: Moving ticket ${ticketId} to ${newStatus}:${newPosition}`);
+            try {
+                const response = await fetch('/api/job-board/move', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ticket_id: ticketId,
+                        new_status: newStatus,
+                        new_position: newPosition
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('Ticket moved successfully');
+                    // Reload the entire board to ensure consistency
+                    loadJobBoard();
+                } else {
+                    console.error('Error moving ticket:', result.error);
+                    alert('Failed to move ticket: ' + result.error);
+                }
+                
+            } catch (error) {
+                console.error('Error moving ticket:', error);
+                alert('Failed to move ticket. Please try again.');
+                // Reload board to reset state
+                loadJobBoard();
+            }
+        }
+
+        // Create new ticket
+        async function createNewTicket() {
+            const customerName = prompt('Enter customer name:');
+            if (!customerName) return;
+            
+            const serviceType = prompt('Enter service type:') || 'Septic Service';
+            
+            try {
+                const response = await fetch('/api/job-board/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        customer_name: customerName,
+                        service_type: serviceType
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('Ticket created successfully');
+                    loadJobBoard(); // Reload to show new ticket
+                } else {
+                    console.error('Error creating ticket:', result.error);
+                    alert('Failed to create ticket: ' + result.error);
+                }
+                
+            } catch (error) {
+                console.error('Error creating ticket:', error);
+                alert('Failed to create ticket. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>

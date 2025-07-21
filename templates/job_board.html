@@ -1001,7 +1001,7 @@
     border: 1px solid #dee2e6;
     border-radius: 4px;
     border-left: 3px solid #3498db;
-    cursor: move;
+    cursor: pointer;
     transition: all 0.2s ease, transform 0.15s ease;
     user-select: none;
     flex-shrink: 0;
@@ -1026,6 +1026,8 @@
 .route-job-item:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     transform: translateY(-1px);
+    background: #f8f9fa;
+    border-color: #3498db;
 }
 
 .route-job-item.dragging-route {
@@ -2021,6 +2023,89 @@ let currentMapTruckId = null;
 let truckMap = null;
 let mapMarkers = [];
 
+// Global variables to track map markers for navigation
+let jobMarkers = new Map(); // Map ticket ID to marker
+let currentNavigationTicket = null;
+
+function navigateToTicketOnMap(ticket) {
+    console.log('🧭 Navigating to ticket on map:', ticket.job_id);
+    
+    // If ticket is assigned to a truck, open that truck's map
+    if (ticket.truck_id) {
+        const truck = trucks.find(t => t.id === ticket.truck_id);
+        if (truck) {
+            console.log('📍 Opening map for truck:', truck.truck_number);
+            currentNavigationTicket = ticket;
+            openTruckMap(ticket.truck_id, truck.truck_number);
+            return;
+        }
+    }
+    
+    // If ticket is not assigned, suggest assigning it first
+    console.log('⚠️ Ticket not assigned to any truck yet');
+    showToast('Please assign this ticket to a truck first to see it on the map', 'warning');
+}
+
+function highlightTicketOnMap(ticketId) {
+    console.log('🎯 Highlighting ticket on map:', ticketId);
+    
+    // Find the marker for this ticket
+    const marker = jobMarkers.get(ticketId);
+    if (marker && truckMap) {
+        // Pan to the marker
+        truckMap.setView(marker.getLatLng(), 15, { animate: true });
+        
+        // Temporarily highlight the marker
+        const originalIcon = marker.getIcon();
+        
+        // Create highlighted icon
+        marker.setIcon(L.divIcon({
+            className: 'job-marker-highlight',
+            html: `<div style="background: #ff4444; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 4px solid white; box-shadow: 0 0 20px rgba(255,68,68,0.6); font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; animation: pulse 2s infinite;">🎯</div>`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        }));
+        
+        // Reset the icon after 3 seconds
+        setTimeout(() => {
+            marker.setIcon(originalIcon);
+        }, 3000);
+        
+        // Show popup with ticket info
+        marker.openPopup();
+    }
+}
+
+function showToast(message, type = 'info') {
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    
+    // Style the toast
+    Object.assign(toast.style, {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '12px 16px',
+        borderRadius: '4px',
+        color: 'white',
+        fontSize: '14px',
+        zIndex: '10000',
+        maxWidth: '300px',
+        backgroundColor: type === 'warning' ? '#f39c12' : type === 'error' ? '#e74c3c' : '#3498db'
+    });
+    
+    document.body.appendChild(toast);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
+}
+
 function openTruckMap(truckId, truckNumber) {
     console.log('Opening truck map for:', truckNumber, 'ID:', truckId);
     currentMapTruckId = truckId;
@@ -2037,6 +2122,14 @@ function openTruckMap(truckId, truckNumber) {
         console.log('Initializing map...');
         try {
             initializeTruckMap(truckId);
+            
+            // If there's a navigation ticket, highlight it after the map is built
+            if (currentNavigationTicket && currentNavigationTicket.truck_id === truckId) {
+                setTimeout(() => {
+                    highlightTicketOnMap(currentNavigationTicket.id);
+                    currentNavigationTicket = null; // Reset after use
+                }, 1000); // Wait for map to be fully built
+            }
         } catch (error) {
             console.error('Error initializing map:', error);
             document.getElementById('truck-map').innerHTML = `
@@ -2060,6 +2153,7 @@ function closeTruckMapModal() {
         truckMap.remove();
         truckMap = null;
         mapMarkers = [];
+        jobMarkers.clear(); // Clear navigation markers
     }
 }
 
@@ -2223,6 +2317,9 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
                 // Add Z-index to ensure job markers appear on top
                 zIndexOffset: 1000
             }).addTo(truckMap);
+            
+            // Store marker in jobMarkers map for navigation
+            jobMarkers.set(ticket.id, jobMarker);
             
             // Create detailed popup content
             const scheduledTime = ticket.scheduled_date ? 
@@ -2445,6 +2542,18 @@ function createRouteSummary(tickets) {
         jobItem.addEventListener('dragover', handleRouteItemDragOver);
         jobItem.addEventListener('drop', handleRouteItemDrop);
         jobItem.addEventListener('dragenter', e => e.preventDefault());
+        
+        // Add click handler for map navigation
+        jobItem.addEventListener('click', function(e) {
+            // Don't navigate if dragging
+            if (draggedRouteItem) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('🧭 Route item clicked, navigating to map location for ticket:', ticket.id);
+            highlightTicketOnMap(ticket.id);
+        });
         
         routeJobsList.appendChild(jobItem);
     });
