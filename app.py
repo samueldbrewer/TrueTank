@@ -268,6 +268,10 @@ def ai_estimator():
 def drive_time_calculator():
     return render_template('drive_time_calculator.html')
 
+@app.route('/admin')
+def admin_panel():
+    return render_template('admin.html')
+
 @app.route('/team-member/create')
 def create_team_member():
     return render_template('team_member_form.html')

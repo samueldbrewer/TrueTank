@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - TrueTank</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .admin-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .admin-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .admin-header h1 {
+            color: #2c5aa0;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .admin-section {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .admin-section h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .admin-section p {
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+
+        .admin-button {
+            background: linear-gradient(135deg, #2c5aa0, #1e3d72);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 5px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            margin-right: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .admin-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(44, 90, 160, 0.3);
+        }
+
+        .admin-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .danger-button {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .danger-button:hover {
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+        }
+
+        .result-message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .result-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .result-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            display: none;
+            color: #666;
+            font-style: italic;
+        }
+
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            margin: 0;
+            color: #2c5aa0;
+            font-size: 2rem;
+        }
+
+        .stat-card p {
+            margin: 0.5rem 0 0 0;
+            color: #666;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>🚛 TrueTank</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/job-board" class="nav-link">Job Board</a>
+                <a href="/customers" class="nav-link">Customers</a>
+                <a href="/admin" class="nav-link active">Admin</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>🔧 Admin Panel</h1>
+            <p>System administration and bulk operations</p>
+        </div>
+
+        <!-- Database Operations Section -->
+        <div class="admin-section">
+            <h2>📅 Schedule Management</h2>
+            <p>Bulk update ticket scheduling dates for testing and demonstration purposes.</p>
+            
+            <div class="warning-box">
+                ⚠️ <strong>Warning:</strong> This will update ALL tickets in the database. Use with caution in production.
+            </div>
+
+            <button class="admin-button" onclick="updateAllDates()" id="updateDatesBtn">
+                📆 Update All Tickets to Today/Tomorrow
+            </button>
+            
+            <div class="loading" id="updateDatesLoading">
+                ⏳ Updating tickets...
+            </div>
+            
+            <div class="result-message" id="updateDatesResult"></div>
+        </div>
+
+        <!-- System Stats Section -->
+        <div class="admin-section">
+            <h2>📊 System Statistics</h2>
+            <div class="admin-stats" id="systemStats">
+                <div class="stat-card">
+                    <h3>-</h3>
+                    <p>Total Tickets</p>
+                </div>
+                <div class="stat-card">
+                    <h3>-</h3>
+                    <p>Total Customers</p>
+                </div>
+                <div class="stat-card">
+                    <h3>-</h3>
+                    <p>Active Trucks</p>
+                </div>
+                <div class="stat-card">
+                    <h3>-</h3>
+                    <p>Team Members</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Section -->
+        <div class="admin-section">
+            <h2>⚡ Quick Actions</h2>
+            <button class="admin-button" onclick="window.location.href='/database'">
+                🗄️ View Database
+            </button>
+            <button class="admin-button" onclick="window.location.href='/fleet'">
+                🚛 Manage Fleet
+            </button>
+            <button class="admin-button" onclick="window.location.href='/team'">
+                👥 Manage Team
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Load system stats on page load
+        async function loadSystemStats() {
+            try {
+                // For now, we'll use placeholder data
+                // In the future, you could add an API endpoint for this
+                const stats = {
+                    tickets: '{{ ticket_count | default("-") }}',
+                    customers: '{{ customer_count | default("-") }}',
+                    trucks: '{{ truck_count | default("-") }}',
+                    team: '{{ team_count | default("-") }}'
+                };
+                
+                // Update if we have data
+                document.querySelectorAll('.stat-card h3')[0].textContent = stats.tickets;
+                document.querySelectorAll('.stat-card h3')[1].textContent = stats.customers;
+                document.querySelectorAll('.stat-card h3')[2].textContent = stats.trucks;
+                document.querySelectorAll('.stat-card h3')[3].textContent = stats.team;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function updateAllDates() {
+            const button = document.getElementById('updateDatesBtn');
+            const loading = document.getElementById('updateDatesLoading');
+            const result = document.getElementById('updateDatesResult');
+            
+            // Reset state
+            result.style.display = 'none';
+            result.className = 'result-message';
+            
+            // Show loading
+            button.disabled = true;
+            loading.style.display = 'block';
+            
+            try {
+                const response = await fetch('/api/admin/update-all-dates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.className = 'result-message success';
+                    result.innerHTML = `
+                        ✅ <strong>Success!</strong> ${data.message}<br>
+                        📅 ${data.today_count} tickets scheduled for today<br>
+                        📅 ${data.tomorrow_count} tickets scheduled for tomorrow
+                    `;
+                } else {
+                    result.className = 'result-message error';
+                    result.innerHTML = `❌ <strong>Error:</strong> ${data.error || 'Failed to update tickets'}`;
+                }
+                
+                result.style.display = 'block';
+            } catch (error) {
+                console.error('Error updating dates:', error);
+                result.className = 'result-message error';
+                result.innerHTML = `❌ <strong>Error:</strong> Network error - ${error.message}`;
+                result.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Load stats on page load
+        loadSystemStats();
+    </script>
+</body>
+</html>
