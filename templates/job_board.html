@@ -111,6 +111,26 @@
                                     <span class="detail-value">Equipment Storage</span>
                                 </div>
                             </div>
+                            
+                            <!-- Tank Status (Compact) -->
+                            <div class="tank-status-compact">
+                                <div class="tank-header">
+                                    <span class="tank-icon">🛢️</span>
+                                    <span id="tank-status-badge" class="tank-badge tank-badge-ok">OK</span>
+                                    <span id="tank-percentage" class="tank-percent">0%</span>
+                                </div>
+                                <div class="tank-bar-compact">
+                                    <div id="tank-fill-compact" class="tank-fill-compact"></div>
+                                    <div id="tank-threshold-compact" class="tank-threshold-compact"></div>
+                                </div>
+                                <div class="tank-info">
+                                    <span id="tank-current-gallons">0</span>/<span id="tank-capacity-gallons">0</span> gal
+                                    <span id="tank-until-dump" class="tank-until-dump">• 0 until dump</span>
+                                </div>
+                                <div id="tank-dump-warning" class="tank-dump-warning" style="display: none;">
+                                    ⚠️ Dump required before next jobs
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Team Assignment Section -->
@@ -831,6 +851,106 @@
     margin: 0 0 0.75rem 0;
     color: #2c3e50;
     font-size: 1rem;
+}
+
+/* Tank Status Compact - Inside Truck Info */
+.tank-status-compact {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem;
+    border: 1px solid #e9ecef;
+    margin-top: 0.75rem;
+}
+
+.tank-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tank-icon {
+    font-size: 1rem;
+}
+
+.tank-badge {
+    padding: 0.15rem 0.4rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.tank-badge-ok {
+    background: #d4edda;
+    color: #155724;
+}
+
+.tank-badge-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.tank-badge-danger {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.tank-percent {
+    margin-left: auto;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #495057;
+}
+
+.tank-bar-compact {
+    position: relative;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.tank-fill-compact {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745 0%, #ffc107 70%, #dc3545 90%);
+    border-radius: inherit;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.tank-threshold-compact {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    background: #dc3545;
+    left: 85%;
+    z-index: 1;
+}
+
+.tank-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.tank-until-dump {
+    color: #495057;
+}
+
+.tank-dump-warning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    text-align: center;
+    border: 1px solid #ffeaa7;
 }
 
 .team-member-info {
@@ -2057,8 +2177,8 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
         allPoints.push(teamMemberCoords);
     }
     
-    // 3. Add current truck location (simulated - parked at equipment storage)
-    const truckCoords = [38.3125, -85.4580]; // Equipment storage location
+    // 3. Add current truck location (equipment storage in Pewee Valley area)  
+    const truckCoords = [38.3125, -85.4580]; // Equipment storage location - Pewee Valley area
     const truckMarker = L.marker(truckCoords, {
         icon: L.divIcon({
             className: 'truck-marker',
@@ -2075,8 +2195,18 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
     // 4. Add job locations for tickets in this truck (numbered by their route_position order from database)
     if (orderedTickets.length > 0) {
         orderedTickets.forEach((ticket, index) => {
-            // Use the actual customer address to generate coordinates
-            const coords = generateCoordinatesForAddress(ticket.customer_address || '', index);
+            // Use real customer GPS coordinates if available, otherwise generate coordinates
+            let coords;
+            if (ticket.customer_gps_coordinates) {
+                // Parse stored GPS coordinates "latitude,longitude"
+                const [lat, lng] = ticket.customer_gps_coordinates.split(',');
+                coords = [parseFloat(lat), parseFloat(lng)];
+                console.log(`📍 Job ${index + 1} (${ticket.job_id}): Using real GPS coordinates [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]`);
+            } else {
+                // Fallback to address-based coordinate generation
+                coords = generateCoordinatesForAddress(ticket.customer_address || '', index);
+                console.log(`📍 Job ${index + 1} (${ticket.job_id}): Generated coordinates from address [${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}]`);
+            }
             allPoints.push(coords);
             
             // Get priority color for the marker
@@ -2086,10 +2216,12 @@ function initializeMapWithTickets(truckInfo, assignedTeamMember, truckTickets) {
             const jobMarker = L.marker(coords, {
                 icon: L.divIcon({
                     className: 'job-marker',
-                    html: `<div style="background: ${priorityColor}; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 14px;">${index + 1}</div>`,
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 16]
-                })
+                    html: `<div style="background: ${priorityColor}; color: white; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.4); font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">${index + 1}</div>`,
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17]
+                }),
+                // Add Z-index to ensure job markers appear on top
+                zIndexOffset: 1000
             }).addTo(truckMap);
             
             // Create detailed popup content
@@ -2147,12 +2279,66 @@ function getTeamMemberHomeCoords(memberName) {
 }
 
 function generateCoordinatesForAddress(address, index) {
-    // Generate realistic coordinates around Pewee Valley, KY area
-    // This simulates geocoding - in production you'd use a real geocoding service
+    // Improved geocoding simulation using real Louisville street coordinates
+    // This provides more accurate positioning for common Louisville addresses
     
-    const baseCoords = {
+    if (!address) {
+        return [38.2527, -85.7585]; // Default Louisville downtown
+    }
+    
+    // Specific street coordinate mappings for Louisville area
+    const streetCoordinates = {
+        // Downtown Louisville
+        '200 S 5th St': [38.2516, -85.7594],
+        '400 W Liberty St': [38.2556, -85.7623],
+        '800 W Main St': [38.2540, -85.7671],
+        
+        // South Louisville
+        '1900 S 3rd St': [38.2347, -85.7563],
+        '2300 Bardstown Rd': [38.2385, -85.7203],
+        '1200 Bardstown Rd': [38.2448, -85.7298],
+        
+        // East Louisville
+        '4600 Outer Loop': [38.2156, -85.6834],
+        '3200 Poplar Level Rd': [38.2089, -85.7012],
+        
+        // West Louisville  
+        '1000 River Rd': [38.2689, -85.7923],
+        '2400 W Broadway': [38.2597, -85.7934],
+        
+        // St. Matthews area
+        '4800 Shelbyville Rd': [38.2524, -85.6234],
+        '120 Sears Ave': [38.2587, -85.6345],
+        
+        // Highlands area
+        '1500 Bardstown Rd': [38.2423, -85.7234],
+        '2000 Frankfort Ave': [38.2689, -85.7345],
+        
+        // Okolona/South End
+        '5600 Dixie Hwy': [38.1834, -85.7923],
+        '7200 Preston Hwy': [38.1689, -85.7234]
+    };
+    
+    // First, try to find exact street match
+    for (const [street, coords] of Object.entries(streetCoordinates)) {
+        if (address.includes(street.split(' ').slice(1).join(' '))) { // Match street name without number
+            // Add small random offset for different addresses on same street
+            const offset = 0.001; // About 100 meters
+            return [
+                coords[0] + (Math.random() - 0.5) * offset,
+                coords[1] + (Math.random() - 0.5) * offset
+            ];
+        }
+        // Also try exact address match
+        if (address.includes(street)) {
+            return [...coords];
+        }
+    }
+    
+    // If no exact match, use area-based coordinates with proper Louisville bounds
+    const cityCoordinates = {
+        'Louisville': [38.2527, -85.7585],
         'Pewee Valley': [38.3148, -85.4569],
-        'Louisville': [38.2542, -85.7585],
         'LaGrange': [38.4048, -85.3816],
         'Crestwood': [38.3414, -85.4794],
         'Buckner': [38.3503, -85.4630],
@@ -2162,19 +2348,36 @@ function generateCoordinatesForAddress(address, index) {
     };
     
     // Find city in address
-    let coords = [38.3148, -85.4569]; // Default to Pewee Valley
+    let coords = [38.2527, -85.7585]; // Default to Louisville downtown
     
-    if (address) {
-        for (const [city, cityCoords] of Object.entries(baseCoords)) {
-            if (address.includes(city)) {
-                coords = [...cityCoords];
-                break;
-            }
+    for (const [city, cityCoords] of Object.entries(cityCoordinates)) {
+        if (address.toLowerCase().includes(city.toLowerCase())) {
+            coords = [...cityCoords];
+            break;
         }
     }
     
-    // Add some random offset to simulate different addresses in the same city
-    const offset = 0.02; // About 1-2 miles
+    // For Louisville addresses, try to place them in appropriate areas based on street names
+    if (address.toLowerCase().includes('louisville')) {
+        if (address.includes('Bardstown Rd') || address.includes('Bardstown Road')) {
+            coords = [38.2385, -85.7203]; // Bardstown Road corridor
+        } else if (address.includes('Dixie Hwy') || address.includes('Dixie Highway')) {
+            coords = [38.1934, -85.7923]; // Dixie Highway corridor
+        } else if (address.includes('Preston Hwy') || address.includes('Preston Highway')) {
+            coords = [38.1889, -85.7234]; // Preston Highway corridor
+        } else if (address.includes('Shelbyville Rd') || address.includes('Shelbyville Road')) {
+            coords = [38.2524, -85.6234]; // Shelbyville Road corridor
+        } else if (address.includes('Outer Loop')) {
+            coords = [38.2156, -85.6834]; // Outer Loop area
+        } else if (address.includes('Main St') || address.includes('W Main')) {
+            coords = [38.2540, -85.7671]; // Main Street corridor
+        } else if (address.includes('Broadway')) {
+            coords = [38.2597, -85.7934]; // Broadway corridor
+        }
+    }
+    
+    // Add realistic random offset within neighborhood (about 0.5 miles)
+    const offset = 0.005;
     coords[0] += (Math.random() - 0.5) * offset;
     coords[1] += (Math.random() - 0.5) * offset;
     
@@ -2330,7 +2533,85 @@ function populateSidebarInfo(truckInfo, assignedTeamMember) {
         `;
         teamMemberDiv.className = 'team-member-info';
     }
+    
+    // Update tank tracking information
+    updateTankTrackingDisplay(truckInfo);
 }
+
+// Update tank tracking display with current truck data
+function updateTankTrackingDisplay(truckInfo) {
+    // Get tank tracking data
+    const capacity = truckInfo.tank_capacity || 3000;
+    const currentLevel = truckInfo.current_tank_level || 0;
+    const threshold = truckInfo.tank_full_threshold || 0.85;
+    const fillPercentage = (currentLevel / capacity * 100) || 0;
+    const gallonsUntilFull = Math.max(0, (capacity * threshold) - currentLevel);
+    
+    console.log('🛢️ Updating tank display:', {
+        capacity, currentLevel, threshold, fillPercentage, gallonsUntilFull
+    });
+    
+    // Update fill percentage display
+    const percentEl = document.getElementById('tank-percentage');
+    if (percentEl) {
+        percentEl.textContent = `${fillPercentage.toFixed(1)}%`;
+    }
+    
+    // Update tank fill bar
+    const fillBar = document.getElementById('tank-fill-compact');
+    if (fillBar) {
+        fillBar.style.width = `${fillPercentage}%`;
+    }
+    
+    // Update threshold line position
+    const thresholdLine = document.getElementById('tank-threshold-compact');
+    if (thresholdLine) {
+        thresholdLine.style.left = `${threshold * 100}%`;
+    }
+    
+    // Update gallons display
+    const currentGallonsEl = document.getElementById('tank-current-gallons');
+    const capacityGallonsEl = document.getElementById('tank-capacity-gallons');
+    if (currentGallonsEl) currentGallonsEl.textContent = Math.round(currentLevel);
+    if (capacityGallonsEl) capacityGallonsEl.textContent = capacity;
+    
+    // Update until dump display
+    const untilDumpEl = document.getElementById('tank-until-dump');
+    if (untilDumpEl) {
+        untilDumpEl.textContent = `• ${Math.round(gallonsUntilFull)} until dump`;
+    }
+    
+    // Update status badge
+    const statusBadge = document.getElementById('tank-status-badge');
+    const dumpWarning = document.getElementById('tank-dump-warning');
+    
+    const isDumpNeeded = fillPercentage >= (threshold * 100);
+    const isNearFull = fillPercentage >= (threshold * 100 * 0.9);
+    
+    if (statusBadge) {
+        // Remove existing badge classes
+        statusBadge.classList.remove('tank-badge-ok', 'tank-badge-warning', 'tank-badge-danger');
+        
+        if (isDumpNeeded) {
+            statusBadge.textContent = 'DUMP';
+            statusBadge.classList.add('tank-badge-danger');
+        } else if (isNearFull) {
+            statusBadge.textContent = 'NEAR FULL';
+            statusBadge.classList.add('tank-badge-warning');
+        } else {
+            statusBadge.textContent = 'OK';
+            statusBadge.classList.add('tank-badge-ok');
+        }
+    }
+    
+    // Show/hide dump warning
+    if (dumpWarning) {
+        dumpWarning.style.display = isDumpNeeded ? 'block' : 'none';
+    }
+    
+    console.log('✅ Tank display updated successfully');
+}
+
 
 // Animation functions for smooth card movement
 function animateCardsAfterRemoval(removedCard) {

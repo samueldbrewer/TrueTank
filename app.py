@@ -1,9 +1,10 @@
 import os
 import requests
 from flask import Flask, render_template, request, jsonify
-from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember, TruckTeamAssignment
+from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember, TruckTeamAssignment, DumpSite
 from dotenv import load_dotenv
 from datetime import datetime
+import tank_tracking
 
 # Import OpenAI at the top level
 try:
@@ -271,7 +272,8 @@ def edit_septic_system(system_id):
 def fleet_manager():
     trucks = Truck.query.all()
     locations = Location.query.filter_by(is_active=True).all()
-    return render_template('fleet_manager.html', trucks=trucks, locations=locations)
+    dump_sites = DumpSite.query.all()
+    return render_template('fleet_manager.html', trucks=trucks, locations=locations, dump_sites=dump_sites)
 
 @app.route('/truck/create')
 def create_truck():
@@ -320,6 +322,107 @@ def create_team_member():
 def edit_team_member(member_id):
     team_member = TeamMember.query.get_or_404(member_id)
     return render_template('team_member_form.html', team_member=team_member)
+
+# Dump Site Management Routes
+@app.route('/api/dump-sites', methods=['GET'])
+def get_dump_sites():
+    dump_sites = DumpSite.query.all()
+    return jsonify([site.to_dict() for site in dump_sites])
+
+@app.route('/api/dump-sites', methods=['POST'])
+def create_dump_site():
+    try:
+        data = request.get_json()
+        
+        dump_site = DumpSite(
+            name=data['name'],
+            facility_type=data.get('facility_type', 'treatment_plant'),
+            street_address=data['street_address'],
+            city=data['city'],
+            state=data['state'],
+            zip_code=data.get('zip_code'),
+            county=data.get('county'),
+            operating_hours=data.get('operating_hours'),
+            cost_per_gallon=float(data.get('cost_per_gallon', 0.0)),
+            max_capacity_per_visit=int(data.get('max_capacity_per_visit')) if data.get('max_capacity_per_visit') else None,
+            estimated_dump_time=int(data.get('estimated_dump_time', 15)),
+            is_active=data.get('is_active', True),
+            accepts_septic_waste=data.get('accepts_septic_waste', True),
+            accepts_grease_waste=data.get('accepts_grease_waste', False),
+            requires_appointment=data.get('requires_appointment', False),
+            contact_person=data.get('contact_person'),
+            phone_number=data.get('phone_number'),
+            email=data.get('email'),
+            special_instructions=data.get('special_instructions'),
+            equipment_notes=data.get('equipment_notes'),
+            access_notes=data.get('access_notes')
+        )
+        
+        db.session.add(dump_site)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'dump_site': dump_site.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/dump-sites/<int:site_id>', methods=['PUT'])
+def update_dump_site(site_id):
+    try:
+        dump_site = DumpSite.query.get_or_404(site_id)
+        data = request.get_json()
+        
+        # Update fields
+        dump_site.name = data.get('name', dump_site.name)
+        dump_site.facility_type = data.get('facility_type', dump_site.facility_type)
+        dump_site.street_address = data.get('street_address', dump_site.street_address)
+        dump_site.city = data.get('city', dump_site.city)
+        dump_site.state = data.get('state', dump_site.state)
+        dump_site.zip_code = data.get('zip_code', dump_site.zip_code)
+        dump_site.county = data.get('county', dump_site.county)
+        dump_site.operating_hours = data.get('operating_hours', dump_site.operating_hours)
+        dump_site.cost_per_gallon = float(data.get('cost_per_gallon', dump_site.cost_per_gallon))
+        if data.get('max_capacity_per_visit') is not None:
+            dump_site.max_capacity_per_visit = int(data['max_capacity_per_visit']) if data['max_capacity_per_visit'] else None
+        dump_site.estimated_dump_time = int(data.get('estimated_dump_time', dump_site.estimated_dump_time))
+        dump_site.is_active = data.get('is_active', dump_site.is_active)
+        dump_site.accepts_septic_waste = data.get('accepts_septic_waste', dump_site.accepts_septic_waste)
+        dump_site.accepts_grease_waste = data.get('accepts_grease_waste', dump_site.accepts_grease_waste)
+        dump_site.requires_appointment = data.get('requires_appointment', dump_site.requires_appointment)
+        dump_site.contact_person = data.get('contact_person', dump_site.contact_person)
+        dump_site.phone_number = data.get('phone_number', dump_site.phone_number)
+        dump_site.email = data.get('email', dump_site.email)
+        dump_site.special_instructions = data.get('special_instructions', dump_site.special_instructions)
+        dump_site.equipment_notes = data.get('equipment_notes', dump_site.equipment_notes)
+        dump_site.access_notes = data.get('access_notes', dump_site.access_notes)
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'dump_site': dump_site.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/dump-sites/<int:site_id>', methods=['DELETE'])
+def delete_dump_site(site_id):
+    try:
+        dump_site = DumpSite.query.get_or_404(site_id)
+        
+        # Check if any trucks have this as preferred dump site
+        trucks_using = Truck.query.filter_by(preferred_dump_site_id=site_id).count()
+        if trucks_using > 0:
+            return jsonify({
+                'success': False, 
+                'error': f'Cannot delete: {trucks_using} truck(s) have this as their preferred dump site'
+            }), 400
+        
+        db.session.delete(dump_site)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/tickets', methods=['GET'])
 def get_tickets():
@@ -411,7 +514,7 @@ def get_job_board_data():
         'date': target_date.isoformat(),
         'pending_tickets': [ticket.to_dict() for ticket in pending_tickets],
         'truck_schedules': truck_schedules,
-        'trucks': [{'id': t.id, 'truck_number': t.truck_number, 'make': t.make, 'model': t.model, 'storage_location_address': f"{t.storage_location.street_address}, {t.storage_location.city}, {t.storage_location.state}" if t.storage_location else None} for t in trucks],
+        'trucks': [t.to_dict() for t in trucks],
         'team_assignments': team_assignments_dict,
         'sort_by': sort_by
     })
@@ -762,6 +865,94 @@ def assign_ticket():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/customers/<int:customer_id>/geocode', methods=['POST'])
+def geocode_customer_address(customer_id):
+    """Geocode a specific customer's address and update their GPS coordinates"""
+    try:
+        customer = Customer.query.get_or_404(customer_id)
+        
+        # Build full address
+        address_parts = []
+        if customer.street_address:
+            address_parts.append(customer.street_address)
+        if customer.city:
+            address_parts.append(customer.city)
+        if customer.state:
+            address_parts.append(customer.state)
+        if customer.zip_code:
+            address_parts.append(customer.zip_code)
+        
+        if not address_parts:
+            return jsonify({'error': 'No address information available'}), 400
+        
+        full_address = ', '.join(address_parts)
+        
+        # Try geocoding using the available geocoding function
+        coords = None
+        if OPENROUTE_API_KEY:
+            coords = geocode_address(full_address)
+        
+        # If OpenRoute fails or isn't available, try Nominatim
+        if not coords:
+            coords = geocode_address_nominatim(full_address)
+        
+        if coords and coords.get('latitude') and coords.get('longitude'):
+            # Store coordinates in "latitude,longitude" format
+            gps_string = f"{coords['latitude']},{coords['longitude']}"
+            customer.gps_coordinates = gps_string
+            customer.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Address geocoded successfully',
+                'gps_coordinates': gps_string,
+                'latitude': coords['latitude'],
+                'longitude': coords['longitude']
+            })
+        else:
+            return jsonify({'error': 'Could not geocode address'}), 400
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+def geocode_address_nominatim(address):
+    """Geocode address using Nominatim (OpenStreetMap) - free service"""
+    try:
+        import requests
+        
+        # OpenStreetMap Nominatim API - free, no key required
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            'q': address,
+            'format': 'json',
+            'addressdetails': 1,
+            'limit': 1,
+            'countrycodes': 'us'  # Limit to US addresses
+        }
+        
+        headers = {
+            'User-Agent': 'TrueTank-Septic-Service/1.0'  # Required by Nominatim
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        if data and len(data) > 0:
+            result = data[0]
+            return {
+                'latitude': float(result['lat']),
+                'longitude': float(result['lon'])
+            }
+        
+        return None
+    except Exception as e:
+        print(f"Nominatim geocoding error: {e}")
+        return None
 
 # Customer Management APIs
 @app.route('/api/customers', methods=['POST'])
@@ -1393,6 +1584,74 @@ def delete_truck_api(truck_id):
         db.session.commit()
         
         return jsonify({'success': True, 'message': 'Truck deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trucks/<int:truck_id>/tank-level', methods=['PUT'])
+def update_truck_tank_level(truck_id):
+    """Update truck tank level"""
+    try:
+        truck = Truck.query.get_or_404(truck_id)
+        data = request.get_json()
+        
+        current_tank_level = data.get('current_tank_level')
+        if current_tank_level is None:
+            return jsonify({'error': 'current_tank_level is required'}), 400
+        
+        # Validate tank level is within capacity
+        if current_tank_level < 0:
+            return jsonify({'error': 'Tank level cannot be negative'}), 400
+        
+        if truck.tank_capacity and current_tank_level > truck.tank_capacity:
+            return jsonify({'error': f'Tank level cannot exceed capacity of {truck.tank_capacity} gallons'}), 400
+        
+        # Update truck tank level
+        truck.current_tank_level = float(current_tank_level)
+        truck.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Tank level updated successfully',
+            'truck_data': truck.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trucks/<int:truck_id>/tank-dump', methods=['PUT'])
+def mark_truck_tank_dumped(truck_id):
+    """Mark truck tank as dumped (reset to 0 and update dump time)"""
+    try:
+        truck = Truck.query.get_or_404(truck_id)
+        data = request.get_json()
+        
+        dump_time = data.get('dump_time')
+        if dump_time:
+            truck.last_dump_time = datetime.fromisoformat(dump_time.replace('Z', '+00:00'))
+        else:
+            truck.last_dump_time = datetime.utcnow()
+        
+        # Reset tank level to 0
+        truck.current_tank_level = 0.0
+        truck.updated_at = datetime.utcnow()
+        
+        # Update last dump location if provided
+        dump_location = data.get('dump_location')
+        if dump_location:
+            truck.last_dump_location = dump_location
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Tank marked as dumped successfully',
+            'truck_data': truck.to_dict()
+        })
         
     except Exception as e:
         db.session.rollback()
@@ -2681,10 +2940,39 @@ def calculate_multi_stop_route(truck_id, date):
         if not tickets:
             return jsonify({'error': 'No tickets found for this truck and date'}), 404
         
-        # Build route stops - start and end at storage location
+        # Prepare tickets data for tank tracking
+        tickets_data = []
+        for ticket in tickets:
+            if ticket.customer:
+                customer_address = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}"
+                ticket_data = {
+                    'id': ticket.id,
+                    'job_id': ticket.job_id,
+                    'service_type': ticket.service_type,
+                    'estimated_gallons': ticket.estimated_gallons,
+                    'estimated_duration': ticket.estimated_duration or 60,
+                    'customer_name': f"{ticket.customer.first_name} {ticket.customer.last_name}",
+                    'customer_address': customer_address
+                }
+                tickets_data.append(ticket_data)
+        
+        # Update estimated gallons for tickets that don't have estimates
+        tickets_data = tank_tracking.update_ticket_gallons_estimates(tickets_data)
+        
+        # Get truck data for tank tracking
+        truck_data = truck.to_dict()
+        
+        # Get available dump sites
+        dump_sites = DumpSite.query.filter_by(is_active=True).all()
+        dump_sites_data = [site.to_dict() for site in dump_sites]
+        
+        # Build optimized route with dump sites
+        optimized_route = tank_tracking.optimize_route_with_dumps(truck_data, tickets_data, dump_sites_data)
+        
+        # Convert to route stops format for drive time calculation
         route_stops = []
         
-        # Start: Storage location (where truck is parked)
+        # Start: Storage location
         route_stops.append({
             'type': 'start',
             'address': storage_location,
@@ -2692,19 +2980,29 @@ def calculate_multi_stop_route(truck_id, date):
             'icon': '🏭'
         })
         
-        # Customer stops
-        for i, ticket in enumerate(tickets):
-            if ticket.customer:
-                customer_address = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}"
+        # Add optimized route stops (includes customer jobs and dump sites)
+        for stop in optimized_route:
+            if stop['type'] == 'customer_job':
                 route_stops.append({
                     'type': 'customer',
-                    'address': customer_address,
-                    'description': f"{ticket.customer.first_name} {ticket.customer.last_name}",
-                    'job_id': ticket.job_id,
-                    'service_type': ticket.service_type,
-                    'estimated_duration': ticket.estimated_duration or 60,
-                    'ticket_id': ticket.id,
+                    'address': stop['address'],
+                    'description': stop['customer_name'],
+                    'job_id': stop['job_id'],
+                    'service_type': stop['service_type'],
+                    'estimated_duration': stop['estimated_duration'],
+                    'estimated_gallons': stop['estimated_gallons'],
+                    'ticket_id': stop['ticket_id'],
                     'icon': '🏠'
+                })
+            elif stop['type'] == 'dump_site':
+                route_stops.append({
+                    'type': 'dump_site',
+                    'address': stop['address'],
+                    'description': stop['description'],
+                    'dump_site_name': stop['name'],
+                    'estimated_time': stop['estimated_time'],
+                    'gallons_dumped': stop['gallons_dumped'],
+                    'icon': '🗑️'
                 })
         
         # End: Storage location
@@ -2714,6 +3012,13 @@ def calculate_multi_stop_route(truck_id, date):
             'description': 'Equipment Storage',
             'icon': '🏭'
         })
+        
+        # Calculate tank fill progression
+        tank_progression = tank_tracking.calculate_tank_fill_progression(
+            truck_data.get('tank_capacity', 3000),
+            truck_data.get('current_tank_level', 0),
+            tickets_data
+        )
         
         # Calculate drive times between consecutive stops
         route_with_drive_times = []
@@ -2763,6 +3068,9 @@ def calculate_multi_stop_route(truck_id, date):
                     'route_geometry': current_stop.get('route_geometry_to_next')
                 })
         
+        # Get tank status
+        tank_status = tank_tracking.get_tank_status(truck_data)
+        
         return jsonify({
             'success': True,
             'truck_id': truck_id,
@@ -2771,11 +3079,18 @@ def calculate_multi_stop_route(truck_id, date):
             'route_segments': route_segments,
             'total_drive_time': round(total_drive_time, 1),
             'total_distance': round(total_distance, 2),
+            'tank_tracking': {
+                'tank_status': tank_status,
+                'tank_progression': tank_progression,
+                'dump_sites_used': len([s for s in route_stops if s['type'] == 'dump_site']),
+                'estimated_gallons_collected': sum(ticket.get('estimated_gallons', 0) for ticket in tickets_data)
+            },
             'summary': {
                 'total_drive_time': round(total_drive_time, 1),
                 'total_work_time': total_work_time,
                 'total_distance': round(total_distance, 2),
                 'total_stops': len([s for s in route_stops if s['type'] == 'customer']),
+                'dump_stops': len([s for s in route_stops if s['type'] == 'dump_site']),
                 'estimated_total_time': round(total_drive_time + total_work_time, 1)
             }
         })

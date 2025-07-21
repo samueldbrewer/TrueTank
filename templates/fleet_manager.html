@@ -38,6 +38,7 @@
                     <th>Truck #</th>
                     <th>Vehicle Details</th>
                     <th>Tank Specs</th>
+                    <th>Tank Level</th>
                     <th>Status</th>
                     <th>Current Location</th>
                     <th>Mileage/Hours</th>
@@ -60,6 +61,24 @@
                         <strong>{{ truck.tank_capacity or 'N/A' }} gal</strong>
                         <br><small>{{ truck.tank_material|title or 'Unknown' }} - {{ truck.num_compartments or 1 }} compartment(s)</small>
                         {% if truck.pump_type %}<br><small>{{ truck.pump_type }}</small>{% endif %}
+                    </td>
+                    <td>
+                        <div class="tank-level-display" data-truck-id="{{ truck.id }}">
+                            <div class="tank-mini-bar">
+                                <div class="tank-mini-fill" style="width: {{ (((truck.current_tank_level or 0) / truck.tank_capacity * 100) if truck.tank_capacity and truck.tank_capacity > 0 else 0)|round(1) }}%;"></div>
+                                <div class="tank-mini-threshold" style="left: {{ (((truck.tank_full_threshold or 0.85) * 100) if truck.tank_full_threshold else 85)|round(1) }}%;"></div>
+                            </div>
+                            <div class="tank-level-text">
+                                <strong id="tank-level-{{ truck.id }}">{{ (((truck.current_tank_level or 0) / truck.tank_capacity * 100) if truck.tank_capacity and truck.tank_capacity > 0 else 0)|round(1) }}%</strong>
+                                <small>{{ (truck.current_tank_level or 0)|round|int }} / {{ truck.tank_capacity or 0 }} gal</small>
+                            </div>
+                            <div class="tank-level-actions">
+                                <button class="btn btn-xs btn-outline edit-tank-level" data-truck-id="{{ truck.id }}" data-current-level="{{ truck.current_tank_level or 0 }}" data-capacity="{{ truck.tank_capacity or 3000 }}">✏️</button>
+                                {% if truck.tank_capacity and truck.tank_capacity > 0 and ((truck.current_tank_level or 0) / truck.tank_capacity * 100) >= (((truck.tank_full_threshold or 0.85) * 100)) %}
+                                    <button class="btn btn-xs btn-warning mark-dumped" data-truck-id="{{ truck.id }}">🗑️ Dumped</button>
+                                {% endif %}
+                            </div>
+                        </div>
                     </td>
                     <td>
                         <span class="status-badge status-{{ truck.status }}">
@@ -147,6 +166,77 @@
         </div>
     </div>
     {% endif %}
+    
+    <div class="dump-sites-section">
+        <div class="section-header">
+            <h3>Dump Sites</h3>
+            <button class="btn btn-primary" onclick="showAddDumpSiteModal()">+ Add Dump Site</button>
+        </div>
+        <div class="dump-sites-grid">
+            {% for site in dump_sites %}
+            <div class="dump-site-card" data-site-id="{{ site.id }}">
+                <div class="dump-site-header">
+                    <h4>{{ site.name }}</h4>
+                    <div class="dump-site-badges">
+                        <span class="facility-type-badge facility-{{ site.facility_type|replace('_', '-') }}">{{ site.facility_type|replace('_', ' ')|title }}</span>
+                        {% if not site.is_active %}
+                            <span class="status-badge status-inactive">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="dump-site-details">
+                    <div class="detail-row">
+                        <span class="icon">📍</span>
+                        <span>{{ site.street_address }}, {{ site.city }}, {{ site.state }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="icon">💵</span>
+                        <span><strong>${{ "%.3f"|format(site.cost_per_gallon) }}/gal</strong></span>
+                    </div>
+                    {% if site.operating_hours %}
+                    <div class="detail-row">
+                        <span class="icon">🕐</span>
+                        <span>{{ site.operating_hours }}</span>
+                    </div>
+                    {% endif %}
+                    {% if site.phone_number %}
+                    <div class="detail-row">
+                        <span class="icon">📞</span>
+                        <span>{{ site.phone_number }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="dump-site-capabilities">
+                        {% if site.accepts_septic_waste %}
+                            <span class="capability-badge accepts">✓ Septic</span>
+                        {% endif %}
+                        {% if site.accepts_grease_waste %}
+                            <span class="capability-badge accepts">✓ Grease</span>
+                        {% endif %}
+                        {% if site.requires_appointment %}
+                            <span class="capability-badge warning">📅 Appointment Required</span>
+                        {% endif %}
+                    </div>
+                    {% if site.max_capacity_per_visit %}
+                    <div class="detail-row">
+                        <span class="icon">🚛</span>
+                        <span>Max {{ site.max_capacity_per_visit }} gal/visit</span>
+                    </div>
+                    {% endif %}
+                    {% if site.special_instructions %}
+                    <div class="detail-row instructions">
+                        <span class="icon">ℹ️</span>
+                        <span>{{ site.special_instructions }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="dump-site-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editDumpSite({{ site.id }})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteDumpSite({{ site.id }}, '{{ site.name }}')">Delete</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 
 <style>
@@ -338,6 +428,162 @@
     text-align: right;
 }
 
+/* Tank Level Display Styles */
+.tank-level-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 120px;
+}
+
+.tank-mini-bar {
+    position: relative;
+    height: 12px;
+    background: #e9ecef;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+}
+
+.tank-mini-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745 0%, #ffc107 70%, #dc3545 90%);
+    border-radius: inherit;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.tank-mini-threshold {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    background: #dc3545;
+    z-index: 1;
+}
+
+.tank-mini-threshold::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    width: 6px;
+    height: 6px;
+    background: #dc3545;
+    border-radius: 50%;
+}
+
+.tank-level-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.tank-level-text strong {
+    color: #2c3e50;
+    margin-bottom: 0.1rem;
+}
+
+.tank-level-text small {
+    color: #6c757d;
+    font-size: 0.75rem;
+}
+
+.tank-level-actions {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+}
+
+.btn-xs {
+    padding: 0.125rem 0.25rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    border-radius: 3px;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #dee2e6;
+    color: #495057;
+}
+
+.btn-outline:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+/* Tank Level Edit Modal */
+.tank-edit-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.tank-edit-modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 400px;
+}
+
+.tank-edit-modal h4 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.form-group small {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
 @media (max-width: 768px) {
     .fleet-header {
         flex-direction: column;
@@ -353,6 +599,211 @@
     }
     
     .locations-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dump Sites Section Styles */
+.dump-sites-section {
+    margin-top: 3rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h3 {
+    color: #2c3e50;
+    margin: 0;
+}
+
+.dump-sites-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.dump-site-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+    transition: box-shadow 0.2s;
+}
+
+.dump-site-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.dump-site-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.dump-site-header h4 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.dump-site-badges {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.facility-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.facility-treatment-plant {
+    background-color: #3498db;
+    color: white;
+}
+
+.facility-transfer-station {
+    background-color: #9b59b6;
+    color: white;
+}
+
+.facility-landfill {
+    background-color: #e67e22;
+    color: white;
+}
+
+.status-inactive {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.dump-site-details {
+    margin-bottom: 1rem;
+}
+
+.detail-row {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.detail-row.instructions {
+    font-size: 0.85rem;
+    color: #666;
+    font-style: italic;
+}
+
+.detail-row .icon {
+    width: 20px;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+}
+
+.dump-site-capabilities {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0.75rem 0;
+}
+
+.capability-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.capability-badge.accepts {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.capability-badge.warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.dump-site-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Dump Site Modal Styles */
+.dump-site-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+}
+
+.dump-site-modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.dump-site-modal h4 {
+    margin: 0 0 1.5rem 0;
+    color: #2c3e50;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.checkbox-group label {
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+@media (max-width: 768px) {
+    .dump-sites-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
         grid-template-columns: 1fr;
     }
 }
@@ -382,5 +833,480 @@ function deleteTruck(truckId, truckNumber) {
         });
     }
 }
+
+// Tank Level Management
+let currentEditTruckId = null;
+
+// Edit tank level modal
+function showTankEditModal(truckId, currentLevel, capacity) {
+    currentEditTruckId = truckId;
+    
+    // Create modal HTML
+    const modalHtml = `
+        <div class="tank-edit-modal" id="tankEditModal">
+            <div class="tank-edit-modal-content">
+                <h4>🛢️ Edit Tank Level</h4>
+                <div class="form-group">
+                    <label for="tankLevel">Current Tank Level (gallons):</label>
+                    <input type="number" id="tankLevel" min="0" max="${capacity}" step="0.1" value="${currentLevel}">
+                    <small>Capacity: ${capacity} gallons</small>
+                </div>
+                <div class="form-group">
+                    <label for="tankPercentage">Percentage:</label>
+                    <input type="number" id="tankPercentage" min="0" max="100" step="0.1" value="${(currentLevel / capacity * 100).toFixed(1)}" readonly>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeTankEditModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveTankLevel()">Save</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Add event listener for real-time percentage calculation
+    const tankLevelInput = document.getElementById('tankLevel');
+    const tankPercentageInput = document.getElementById('tankPercentage');
+    
+    tankLevelInput.addEventListener('input', function() {
+        const level = parseFloat(this.value) || 0;
+        const percentage = (level / capacity * 100).toFixed(1);
+        tankPercentageInput.value = percentage;
+    });
+    
+    // Focus on input
+    tankLevelInput.focus();
+    tankLevelInput.select();
+}
+
+function closeTankEditModal() {
+    const modal = document.getElementById('tankEditModal');
+    if (modal) {
+        modal.remove();
+    }
+    currentEditTruckId = null;
+}
+
+function saveTankLevel() {
+    if (!currentEditTruckId) return;
+    
+    const tankLevel = parseFloat(document.getElementById('tankLevel').value);
+    
+    if (isNaN(tankLevel) || tankLevel < 0) {
+        alert('Please enter a valid tank level.');
+        return;
+    }
+    
+    // Update tank level via API
+    fetch(`/api/trucks/${currentEditTruckId}/tank-level`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            current_tank_level: tankLevel,
+            last_updated: new Date().toISOString()
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Update display without full page reload
+            updateTankLevelDisplay(currentEditTruckId, result.truck_data);
+            closeTankEditModal();
+            alert('Tank level updated successfully!');
+        } else {
+            alert('Error updating tank level: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to update tank level. Please try again.');
+    });
+}
+
+// Mark tank as dumped (reset to 0)
+function markTankDumped(truckId) {
+    if (confirm('Mark this tank as dumped? This will reset the tank level to 0 gallons.')) {
+        fetch(`/api/trucks/${truckId}/tank-dump`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                dump_time: new Date().toISOString()
+            })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Update display without full page reload
+                updateTankLevelDisplay(truckId, result.truck_data);
+                alert('Tank marked as dumped successfully!');
+            } else {
+                alert('Error marking tank as dumped: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to mark tank as dumped. Please try again.');
+        });
+    }
+}
+
+// Update tank level display in the table
+function updateTankLevelDisplay(truckId, truckData) {
+    const display = document.querySelector(`[data-truck-id="${truckId}"]`);
+    if (!display) return;
+    
+    const capacity = truckData.tank_capacity || 3000;
+    const currentLevel = truckData.current_tank_level || 0;
+    const threshold = truckData.tank_full_threshold || 0.85;
+    const percentage = (currentLevel / capacity * 100).toFixed(1);
+    const isDumpNeeded = percentage >= (threshold * 100);
+    
+    // Update progress bar
+    const fillBar = display.querySelector('.tank-mini-fill');
+    if (fillBar) {
+        fillBar.style.width = `${percentage}%`;
+    }
+    
+    // Update percentage text
+    const levelText = display.querySelector(`#tank-level-${truckId}`);
+    if (levelText) {
+        levelText.textContent = `${percentage}%`;
+    }
+    
+    // Update gallons text
+    const gallonsText = display.querySelector('.tank-level-text small');
+    if (gallonsText) {
+        gallonsText.textContent = `${Math.round(currentLevel)} / ${capacity} gal`;
+    }
+    
+    // Update actions (show/hide dump button)
+    const actions = display.querySelector('.tank-level-actions');
+    if (actions) {
+        let dumpButton = actions.querySelector('.mark-dumped');
+        
+        if (isDumpNeeded && !dumpButton) {
+            // Add dump button
+            const editButton = actions.querySelector('.edit-tank-level');
+            editButton.insertAdjacentHTML('afterend', 
+                `<button class="btn btn-xs btn-warning mark-dumped" data-truck-id="${truckId}">🗑️ Dumped</button>`
+            );
+            // Re-attach event listener
+            actions.querySelector('.mark-dumped').addEventListener('click', function() {
+                markTankDumped(truckId);
+            });
+        } else if (!isDumpNeeded && dumpButton) {
+            // Remove dump button
+            dumpButton.remove();
+        }
+    }
+}
+
+// Initialize event listeners when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Edit tank level buttons
+    document.querySelectorAll('.edit-tank-level').forEach(button => {
+        button.addEventListener('click', function() {
+            const truckId = this.dataset.truckId;
+            const currentLevel = parseFloat(this.dataset.currentLevel) || 0;
+            const capacity = parseFloat(this.dataset.capacity) || 3000;
+            showTankEditModal(truckId, currentLevel, capacity);
+        });
+    });
+    
+    // Mark dumped buttons
+    document.querySelectorAll('.mark-dumped').forEach(button => {
+        button.addEventListener('click', function() {
+            const truckId = this.dataset.truckId;
+            markTankDumped(truckId);
+        });
+    });
+    
+    // Close modal on outside click
+    document.addEventListener('click', function(event) {
+        if (event.target.classList.contains('tank-edit-modal')) {
+            closeTankEditModal();
+        }
+    });
+    
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeTankEditModal();
+            closeDumpSiteModal();
+        }
+    });
+});
+
+// Dump Site Management Functions
+let currentEditSiteId = null;
+let dumpSites = [];
+
+// Load dump sites on page load
+loadDumpSites();
+
+function loadDumpSites() {
+    fetch('/api/dump-sites')
+        .then(response => response.json())
+        .then(sites => {
+            dumpSites = sites;
+        })
+        .catch(error => console.error('Error loading dump sites:', error));
+}
+
+function showAddDumpSiteModal() {
+    currentEditSiteId = null;
+    showDumpSiteModal();
+}
+
+function editDumpSite(siteId) {
+    currentEditSiteId = siteId;
+    const site = dumpSites.find(s => s.id === siteId);
+    if (site) {
+        showDumpSiteModal(site);
+    }
+}
+
+function showDumpSiteModal(site = null) {
+    const isEdit = site !== null;
+    const modalTitle = isEdit ? 'Edit Dump Site' : 'Add New Dump Site';
+    
+    const modalHtml = `
+        <div class="dump-site-modal" id="dumpSiteModal">
+            <div class="dump-site-modal-content">
+                <h4>🏭 ${modalTitle}</h4>
+                <form id="dumpSiteForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="siteName">Site Name*</label>
+                            <input type="text" id="siteName" name="name" value="${site ? site.name : ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="facilityType">Facility Type</label>
+                            <select id="facilityType" name="facility_type">
+                                <option value="treatment_plant" ${site && site.facility_type === 'treatment_plant' ? 'selected' : ''}>Treatment Plant</option>
+                                <option value="transfer_station" ${site && site.facility_type === 'transfer_station' ? 'selected' : ''}>Transfer Station</option>
+                                <option value="landfill" ${site && site.facility_type === 'landfill' ? 'selected' : ''}>Landfill</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group full-width">
+                            <label for="streetAddress">Street Address*</label>
+                            <input type="text" id="streetAddress" name="street_address" value="${site ? site.street_address : ''}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="city">City*</label>
+                            <input type="text" id="city" name="city" value="${site ? site.city : ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="state">State*</label>
+                            <input type="text" id="state" name="state" value="${site ? site.state : ''}" maxlength="2" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="zipCode">ZIP Code</label>
+                            <input type="text" id="zipCode" name="zip_code" value="${site ? site.zip_code : ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="county">County</label>
+                            <input type="text" id="county" name="county" value="${site ? site.county : ''}">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="costPerGallon">Cost per Gallon ($)</label>
+                            <input type="number" id="costPerGallon" name="cost_per_gallon" step="0.001" min="0" value="${site ? site.cost_per_gallon : '0.000'}">
+                        </div>
+                        <div class="form-group">
+                            <label for="maxCapacity">Max Capacity per Visit (gal)</label>
+                            <input type="number" id="maxCapacity" name="max_capacity_per_visit" min="0" value="${site ? site.max_capacity_per_visit || '' : ''}">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="operatingHours">Operating Hours</label>
+                            <input type="text" id="operatingHours" name="operating_hours" value="${site ? site.operating_hours || '' : ''}" placeholder="e.g., Mon-Fri 7AM-5PM">
+                        </div>
+                        <div class="form-group">
+                            <label for="estimatedDumpTime">Est. Dump Time (min)</label>
+                            <input type="number" id="estimatedDumpTime" name="estimated_dump_time" min="1" value="${site ? site.estimated_dump_time : '15'}">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contactPerson">Contact Person</label>
+                            <input type="text" id="contactPerson" name="contact_person" value="${site ? site.contact_person || '' : ''}">
+                        </div>
+                        <div class="form-group">
+                            <label for="phoneNumber">Phone Number</label>
+                            <input type="tel" id="phoneNumber" name="phone_number" value="${site ? site.phone_number || '' : ''}">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="${site ? site.email || '' : ''}">
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label>Capabilities</label>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="acceptsSeptic" name="accepts_septic_waste" ${site && site.accepts_septic_waste !== false ? 'checked' : (!site ? 'checked' : '')}>
+                            <label for="acceptsSeptic">Accepts Septic Waste</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="acceptsGrease" name="accepts_grease_waste" ${site && site.accepts_grease_waste ? 'checked' : ''}>
+                            <label for="acceptsGrease">Accepts Grease Waste</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="requiresAppointment" name="requires_appointment" ${site && site.requires_appointment ? 'checked' : ''}>
+                            <label for="requiresAppointment">Requires Appointment</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="isActive" name="is_active" ${site && site.is_active === false ? '' : 'checked'}>
+                            <label for="isActive">Active</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="specialInstructions">Special Instructions</label>
+                        <textarea id="specialInstructions" name="special_instructions" rows="2">${site ? site.special_instructions || '' : ''}</textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="equipmentNotes">Equipment Notes</label>
+                        <textarea id="equipmentNotes" name="equipment_notes" rows="2">${site ? site.equipment_notes || '' : ''}</textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="accessNotes">Access Notes</label>
+                        <textarea id="accessNotes" name="access_notes" rows="2">${site ? site.access_notes || '' : ''}</textarea>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeDumpSiteModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">${isEdit ? 'Update' : 'Create'} Dump Site</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Add form submit handler
+    document.getElementById('dumpSiteForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveDumpSite();
+    });
+}
+
+function closeDumpSiteModal() {
+    const modal = document.getElementById('dumpSiteModal');
+    if (modal) {
+        modal.remove();
+    }
+    currentEditSiteId = null;
+}
+
+function saveDumpSite() {
+    const form = document.getElementById('dumpSiteForm');
+    const formData = new FormData(form);
+    
+    const data = {
+        name: formData.get('name'),
+        facility_type: formData.get('facility_type'),
+        street_address: formData.get('street_address'),
+        city: formData.get('city'),
+        state: formData.get('state'),
+        zip_code: formData.get('zip_code'),
+        county: formData.get('county'),
+        operating_hours: formData.get('operating_hours'),
+        cost_per_gallon: parseFloat(formData.get('cost_per_gallon')) || 0,
+        max_capacity_per_visit: formData.get('max_capacity_per_visit') ? parseInt(formData.get('max_capacity_per_visit')) : null,
+        estimated_dump_time: parseInt(formData.get('estimated_dump_time')) || 15,
+        is_active: formData.get('is_active') === 'on',
+        accepts_septic_waste: formData.get('accepts_septic_waste') === 'on',
+        accepts_grease_waste: formData.get('accepts_grease_waste') === 'on',
+        requires_appointment: formData.get('requires_appointment') === 'on',
+        contact_person: formData.get('contact_person'),
+        phone_number: formData.get('phone_number'),
+        email: formData.get('email'),
+        special_instructions: formData.get('special_instructions'),
+        equipment_notes: formData.get('equipment_notes'),
+        access_notes: formData.get('access_notes')
+    };
+    
+    const url = currentEditSiteId ? `/api/dump-sites/${currentEditSiteId}` : '/api/dump-sites';
+    const method = currentEditSiteId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert(`Dump site ${currentEditSiteId ? 'updated' : 'created'} successfully!`);
+            closeDumpSiteModal();
+            window.location.reload();
+        } else {
+            alert('Error saving dump site: ' + result.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to save dump site. Please try again.');
+    });
+}
+
+function deleteDumpSite(siteId, siteName) {
+    if (confirm(`Are you sure you want to delete dump site "${siteName}"? This action cannot be undone.`)) {
+        fetch(`/api/dump-sites/${siteId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('Dump site deleted successfully!');
+                window.location.reload();
+            } else {
+                alert('Error deleting dump site: ' + result.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to delete dump site. Please try again.');
+        });
+    }
+}
+
+// Close modal on outside click
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('dump-site-modal')) {
+        closeDumpSiteModal();
+    }
+});
 </script>
 {% endblock %}

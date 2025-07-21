@@ -50,6 +50,7 @@ class Customer(db.Model):
     state = db.Column(db.String(50), nullable=True)
     zip_code = db.Column(db.String(20), nullable=True)
     county = db.Column(db.String(100), nullable=True)
+    gps_coordinates = db.Column(db.String(50), nullable=True)  # "latitude,longitude" format
     
     # Billing Address (if different)
     billing_street_address = db.Column(db.String(200), nullable=True)
@@ -93,6 +94,7 @@ class Customer(db.Model):
             'state': self.state,
             'zip_code': self.zip_code,
             'county': self.county,
+            'gps_coordinates': self.gps_coordinates,
             'billing_street_address': self.billing_street_address,
             'billing_city': self.billing_city,
             'billing_state': self.billing_state,
@@ -176,7 +178,8 @@ class Ticket(db.Model):
     disposal_cost = db.Column(db.Float, nullable=True)
     
     # Service Details
-    gallons_pumped = db.Column(db.Integer, nullable=True)
+    gallons_pumped = db.Column(db.Integer, nullable=True)  # actual gallons pumped (post-service)
+    estimated_gallons = db.Column(db.Float, nullable=True)  # estimated gallons for route planning
     waste_type = db.Column(db.String(50), nullable=True)
     disposal_location = db.Column(db.String(100), nullable=True)
     trip_ticket_number = db.Column(db.String(50), nullable=True)
@@ -263,6 +266,7 @@ class Ticket(db.Model):
             'labor_cost': self.labor_cost,
             'disposal_cost': self.disposal_cost,
             'gallons_pumped': self.gallons_pumped,
+            'estimated_gallons': self.estimated_gallons,
             'waste_type': self.waste_type,
             'disposal_location': self.disposal_location,
             'trip_ticket_number': self.trip_ticket_number,
@@ -303,6 +307,7 @@ class Ticket(db.Model):
             'customer_name': f"{self.customer.first_name} {self.customer.last_name}" if self.customer else None,
             'customer_phone': self.customer.phone_primary if self.customer else None,
             'customer_address': f"{self.customer.street_address}, {self.customer.city}, {self.customer.state}" if self.customer and self.customer.street_address else None,
+            'customer_gps_coordinates': self.customer.gps_coordinates if self.customer else None,
         }
 
 class ServiceHistory(db.Model):
@@ -370,6 +375,74 @@ class Location(db.Model):
     def __repr__(self):
         return f'<Location {self.name}>'
 
+class DumpSite(db.Model):
+    """Waste disposal/dump sites where trucks empty their tanks"""
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Basic Information
+    name = db.Column(db.String(100), nullable=False)
+    facility_type = db.Column(db.String(50), nullable=True, default='treatment_plant')  # treatment_plant, transfer_station, landfill
+    
+    # Location Details
+    street_address = db.Column(db.String(200), nullable=False)
+    city = db.Column(db.String(100), nullable=False)
+    state = db.Column(db.String(50), nullable=False)
+    zip_code = db.Column(db.String(20), nullable=True)
+    county = db.Column(db.String(100), nullable=True)
+    gps_coordinates = db.Column(db.String(50), nullable=True)
+    
+    # Operational Details
+    operating_hours = db.Column(db.String(100), nullable=True)
+    cost_per_gallon = db.Column(db.Float, nullable=True, default=0.0)
+    max_capacity_per_visit = db.Column(db.Integer, nullable=True)  # maximum gallons per dump
+    estimated_dump_time = db.Column(db.Integer, nullable=True, default=15)  # minutes to empty tank
+    
+    # Status and Availability
+    is_active = db.Column(db.Boolean, default=True)
+    accepts_septic_waste = db.Column(db.Boolean, default=True)
+    accepts_grease_waste = db.Column(db.Boolean, default=False)
+    requires_appointment = db.Column(db.Boolean, default=False)
+    
+    # Contact Information
+    contact_person = db.Column(db.String(100), nullable=True)
+    phone_number = db.Column(db.String(20), nullable=True)
+    email = db.Column(db.String(100), nullable=True)
+    
+    # Additional Details
+    special_instructions = db.Column(db.Text, nullable=True)
+    equipment_notes = db.Column(db.Text, nullable=True)  # Special equipment requirements
+    access_notes = db.Column(db.Text, nullable=True)  # Gate codes, access instructions
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'facility_type': self.facility_type,
+            'full_address': f"{self.street_address}, {self.city}, {self.state}",
+            'street_address': self.street_address,
+            'city': self.city,
+            'state': self.state,
+            'zip_code': self.zip_code,
+            'operating_hours': self.operating_hours,
+            'cost_per_gallon': self.cost_per_gallon,
+            'max_capacity_per_visit': self.max_capacity_per_visit,
+            'estimated_dump_time': self.estimated_dump_time,
+            'is_active': self.is_active,
+            'accepts_septic_waste': self.accepts_septic_waste,
+            'accepts_grease_waste': self.accepts_grease_waste,
+            'requires_appointment': self.requires_appointment,
+            'contact_person': self.contact_person,
+            'phone_number': self.phone_number,
+            'special_instructions': self.special_instructions
+        }
+    
+    def __repr__(self):
+        return f'<DumpSite {self.name}>'
+
 class Truck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
@@ -406,6 +479,13 @@ class Truck(db.Model):
     status = db.Column(db.String(20), nullable=False, default='active')  # active, maintenance, out_of_service
     current_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)
     
+    # Tank Fill Tracking
+    current_tank_level = db.Column(db.Float, default=0.0)  # current gallons in tank
+    tank_full_threshold = db.Column(db.Float, default=0.85)  # dump when tank reaches this percentage (0.0-1.0)
+    last_dump_time = db.Column(db.DateTime, nullable=True)  # when tank was last emptied
+    last_dump_location = db.Column(db.String(100), nullable=True)  # last dump site used
+    preferred_dump_site_id = db.Column(db.Integer, db.ForeignKey('dump_site.id'), nullable=True)  # preferred dump site
+    
     # Maintenance Tracking
     current_mileage = db.Column(db.Integer, nullable=True)
     engine_hours = db.Column(db.Float, nullable=True)
@@ -435,6 +515,7 @@ class Truck(db.Model):
     
     # Relationships
     tickets = db.relationship('Ticket', backref='truck', lazy=True, foreign_keys='Ticket.truck_id')
+    preferred_dump_site = db.relationship('DumpSite', backref='trucks', lazy=True)
     
     def __repr__(self):
         return f'<Truck {self.truck_number}>'
@@ -454,7 +535,15 @@ class Truck(db.Model):
             'engine_hours': self.engine_hours,
             'storage_location': self.storage_location.name if self.storage_location else None,
             'last_maintenance': self.last_maintenance.isoformat() if self.last_maintenance else None,
-            'next_maintenance_due': self.next_maintenance_due.isoformat() if self.next_maintenance_due else None
+            'next_maintenance_due': self.next_maintenance_due.isoformat() if self.next_maintenance_due else None,
+            # Tank tracking data
+            'current_tank_level': self.current_tank_level,
+            'tank_full_threshold': self.tank_full_threshold,
+            'tank_fill_percentage': round((self.current_tank_level / self.tank_capacity * 100), 1) if self.tank_capacity else 0,
+            'gallons_until_full': max(0, (self.tank_capacity * self.tank_full_threshold) - self.current_tank_level) if self.tank_capacity else 0,
+            'last_dump_time': self.last_dump_time.isoformat() if self.last_dump_time else None,
+            'last_dump_location': self.last_dump_location,
+            'preferred_dump_site': self.preferred_dump_site.name if self.preferred_dump_site else None
         }
 
 class TeamMember(db.Model):
