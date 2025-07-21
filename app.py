@@ -2598,6 +2598,40 @@ def optimize_truck_route(truck_id, date):
         print(f"Route optimization error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/update-all-dates', methods=['POST'])
+def update_all_ticket_dates():
+    """Update all tickets to be scheduled for today and tomorrow"""
+    try:
+        from datetime import timedelta
+        
+        today = datetime.now().date()
+        tomorrow = today + timedelta(days=1)
+        
+        tickets = Ticket.query.all()
+        total_tickets = len(tickets)
+        
+        for i, ticket in enumerate(tickets):
+            if i < total_tickets // 2:
+                ticket.scheduled_date = datetime.combine(today, datetime.min.time())
+            else:
+                ticket.scheduled_date = datetime.combine(tomorrow, datetime.min.time())
+            
+            if ticket.route_position is None:
+                ticket.route_position = i % 10
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Updated {total_tickets} tickets',
+            'today_count': total_tickets // 2,
+            'tomorrow_count': total_tickets - (total_tickets // 2)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Initialize database when app starts (commented out during debugging)
     # init_database()
