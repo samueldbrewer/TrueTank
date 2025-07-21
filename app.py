@@ -134,17 +134,50 @@ def calculate_drive_time(origin_address, destination_address):
             'coordinates': [
                 [origin_lon, origin_lat],
                 [dest_lon, dest_lat]
-            ]
+            ],
+            'instructions': True,
+            'elevation': True
         }
         
         response = requests.post(url, json=data, headers=headers, timeout=15)
         response.raise_for_status()
         
         result = response.json()
-        if result['routes']:
-            # Duration is in seconds, convert to minutes
-            duration_minutes = result['routes'][0]['summary']['duration'] / 60
-            distance_km = result['routes'][0]['summary']['distance'] / 1000
+        if result['routes'] and len(result['routes']) > 0:
+            route = result['routes'][0]
+            
+            # Extract all available data
+            duration_minutes = route['summary']['duration'] / 60
+            distance_km = route['summary']['distance'] / 1000
+            
+            # Get turn-by-turn instructions if available
+            instructions = []
+            if 'segments' in route:
+                for segment in route['segments']:
+                    if 'steps' in segment:
+                        for step in segment['steps']:
+                            instructions.append({
+                                'instruction': step.get('instruction', ''),
+                                'distance': round(step.get('distance', 0), 1),
+                                'duration': round(step.get('duration', 0) / 60, 1),
+                                'type': step.get('type', 0),
+                                'name': step.get('name', ''),
+                                'way_points': step.get('way_points', [])
+                            })
+            
+            # Get route geometry (polyline) if available
+            geometry = route.get('geometry', '')
+            
+            # Get elevation data if available
+            elevation_data = None
+            if 'elevation' in route:
+                elevation_data = {
+                    'ascent': route['elevation'].get('ascent', 0),
+                    'descent': route['elevation'].get('descent', 0)
+                }
+            
+            # Get bounds
+            bbox = route.get('bbox', [])
             
             return {
                 'duration_minutes': round(duration_minutes, 1),
@@ -156,7 +189,13 @@ def calculate_drive_time(origin_address, destination_address):
                 'dest_coords': {
                     'latitude': dest_lat,
                     'longitude': dest_lon
-                }
+                },
+                'instructions': instructions,
+                'geometry': geometry,
+                'bbox': bbox,
+                'elevation': elevation_data,
+                'warnings': route.get('warnings', []),
+                'waypoints': route.get('way_points', [])
             }
         
         return None
@@ -2519,7 +2558,13 @@ def calculate_drive_time_api():
                 'duration_minutes': result['duration_minutes'],
                 'distance_km': result['distance_km'],
                 'origin_coords': result['origin_coords'],
-                'dest_coords': result['dest_coords']
+                'dest_coords': result['dest_coords'],
+                'instructions': result['instructions'],
+                'geometry': result['geometry'],
+                'bbox': result['bbox'],
+                'elevation': result['elevation'],
+                'warnings': result['warnings'],
+                'waypoints': result['waypoints']
             })
         else:
             return jsonify({'error': 'Could not calculate drive time'}), 400

@@ -170,6 +170,120 @@
             background: #dee2e6;
             border-color: #adb5bd;
         }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            color: #2c5aa0;
+            border-bottom-color: #2c5aa0;
+        }
+
+        .tab:hover {
+            color: #2c5aa0;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .instructions-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .instruction-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .instruction-item:last-child {
+            border-bottom: none;
+        }
+
+        .instruction-number {
+            background: #2c5aa0;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .instruction-details {
+            flex: 1;
+        }
+
+        .instruction-text {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .instruction-meta {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .geometry-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .elevation-chart {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+
+        .elevation-item {
+            text-align: center;
+        }
+
+        .elevation-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+
+        .elevation-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2c5aa0;
+        }
     </style>
 </head>
 <body>
@@ -266,26 +380,128 @@
         function showResults(data) {
             hideError();
             
-            resultsContent.innerHTML = `
-                <div class="result-item">
-                    <span class="result-label">🕐 Drive Time:</span>
-                    <span class="result-value">${data.duration_minutes} minutes</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">📏 Distance:</span>
-                    <span class="result-value">${data.distance_km} km</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">🎯 Origin Coordinates:</span>
-                    <span class="result-value">${data.origin_coords.latitude.toFixed(4)}, ${data.origin_coords.longitude.toFixed(4)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">🏁 Destination Coordinates:</span>
-                    <span class="result-value">${data.dest_coords.latitude.toFixed(4)}, ${data.dest_coords.longitude.toFixed(4)}</span>
+            // Create tabs for different data views
+            let tabsHTML = `
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('summary')">Summary</button>
+                    <button class="tab" onclick="showTab('directions')">Directions</button>
+                    <button class="tab" onclick="showTab('technical')">Technical Details</button>
                 </div>
             `;
             
+            // Summary tab content
+            let summaryContent = `
+                <div id="summary-tab" class="tab-content active">
+                    <div class="result-item">
+                        <span class="result-label">🕐 Drive Time:</span>
+                        <span class="result-value">${data.duration_minutes} minutes</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">📏 Distance:</span>
+                        <span class="result-value">${data.distance_km} km</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">🎯 Origin Coordinates:</span>
+                        <span class="result-value">${data.origin_coords.latitude.toFixed(4)}, ${data.origin_coords.longitude.toFixed(4)}</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">🏁 Destination Coordinates:</span>
+                        <span class="result-value">${data.dest_coords.latitude.toFixed(4)}, ${data.dest_coords.longitude.toFixed(4)}</span>
+                    </div>
+            `;
+            
+            // Add elevation data if available
+            if (data.elevation) {
+                summaryContent += `
+                    <div class="elevation-chart">
+                        <div class="elevation-item">
+                            <div class="elevation-label">⬆️ Total Ascent</div>
+                            <div class="elevation-value">${data.elevation.ascent}m</div>
+                        </div>
+                        <div class="elevation-item">
+                            <div class="elevation-label">⬇️ Total Descent</div>
+                            <div class="elevation-value">${data.elevation.descent}m</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            summaryContent += '</div>';
+            
+            // Directions tab content
+            let directionsContent = '<div id="directions-tab" class="tab-content">';
+            if (data.instructions && data.instructions.length > 0) {
+                directionsContent += '<ul class="instructions-list">';
+                data.instructions.forEach((instruction, index) => {
+                    directionsContent += `
+                        <li class="instruction-item">
+                            <div class="instruction-number">${index + 1}</div>
+                            <div class="instruction-details">
+                                <div class="instruction-text">${instruction.instruction}</div>
+                                <div class="instruction-meta">
+                                    ${instruction.distance}m • ${instruction.duration} min
+                                    ${instruction.name ? `• ${instruction.name}` : ''}
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                });
+                directionsContent += '</ul>';
+            } else {
+                directionsContent += '<p>No turn-by-turn directions available.</p>';
+            }
+            directionsContent += '</div>';
+            
+            // Technical details tab
+            let technicalContent = `
+                <div id="technical-tab" class="tab-content">
+                    <div class="result-item">
+                        <span class="result-label">📦 Route Geometry (Polyline):</span>
+                    </div>
+                    <div class="geometry-info">${data.geometry || 'No geometry data available'}</div>
+                    
+                    <div class="result-item" style="margin-top: 1rem;">
+                        <span class="result-label">🗺️ Bounding Box:</span>
+                        <span class="result-value">${data.bbox.length > 0 ? data.bbox.join(', ') : 'Not available'}</span>
+                    </div>
+                    
+                    <div class="result-item">
+                        <span class="result-label">📍 Waypoints:</span>
+                        <span class="result-value">${data.waypoints.length} waypoints</span>
+                    </div>
+            `;
+            
+            if (data.warnings && data.warnings.length > 0) {
+                technicalContent += `
+                    <div class="result-item">
+                        <span class="result-label">⚠️ Warnings:</span>
+                        <span class="result-value">${data.warnings.join(', ')}</span>
+                    </div>
+                `;
+            }
+            
+            technicalContent += '</div>';
+            
+            resultsContent.innerHTML = tabsHTML + summaryContent + directionsContent + technicalContent;
             resultsContainer.classList.add('show');
+            
+            // Store data globally for tab switching
+            window.routeData = data;
+        }
+        
+        // Tab switching function
+        function showTab(tabName) {
+            // Update active tab button
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show selected tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
         }
 
         function setLoading(loading) {
