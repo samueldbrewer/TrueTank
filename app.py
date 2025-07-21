@@ -112,7 +112,8 @@ def calculate_drive_time(origin_address, destination_address):
         print(f"Destination coords: {dest_coords}")
         
         if not origin_coords or not dest_coords:
-            print(f"Could not geocode addresses: {origin_address} -> {destination_address}")
+            failed_address = origin_address if not origin_coords else destination_address
+            print(f"Could not geocode address: '{failed_address}'")
             return None
         
         # Calculate route
@@ -402,14 +403,15 @@ def get_job_board_data():
             team_assignments_dict[str(assignment.truck_id)] = {
                 'team_member_id': assignment.team_member_id,
                 'team_member_name': f"{assignment.team_member.first_name} {assignment.team_member.last_name}",
-                'position': assignment.team_member.position
+                'position': assignment.team_member.position,
+                'home_address': f"{assignment.team_member.home_street_address}, {assignment.team_member.home_city}, {assignment.team_member.home_state}" if assignment.team_member.home_street_address else None
             }
     
     return jsonify({
         'date': target_date.isoformat(),
         'pending_tickets': [ticket.to_dict() for ticket in pending_tickets],
         'truck_schedules': truck_schedules,
-        'trucks': [{'id': t.id, 'truck_number': t.truck_number, 'make': t.make, 'model': t.model} for t in trucks],
+        'trucks': [{'id': t.id, 'truck_number': t.truck_number, 'make': t.make, 'model': t.model, 'storage_location_address': f"{t.storage_location.street_address}, {t.storage_location.city}, {t.storage_location.state}" if t.storage_location else None} for t in trucks],
         'team_assignments': team_assignments_dict,
         'sort_by': sort_by
     })
@@ -2567,7 +2569,7 @@ def calculate_drive_time_api():
                 'waypoints': result['waypoints']
             })
         else:
-            return jsonify({'error': 'Could not calculate drive time'}), 400
+            return jsonify({'error': 'Could not calculate drive time. Please check that both addresses are valid and specific (include city and state).'}), 400
             
     except Exception as e:
         print(f"Drive time API error: {e}")
@@ -2645,6 +2647,141 @@ def optimize_truck_route(truck_id, date):
         
     except Exception as e:
         print(f"Route optimization error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/multi-stop-route/<int:truck_id>/<date>', methods=['POST'])
+def calculate_multi_stop_route(truck_id, date):
+    """Calculate optimal route with drive times between all stops"""
+    try:
+        from datetime import datetime
+        
+        data = request.get_json() or {}
+        
+        # Parse date
+        target_date = datetime.fromisoformat(date).date()
+        
+        # Get truck information and its storage location
+        truck = db.session.get(Truck, truck_id)
+        if not truck:
+            return jsonify({'error': 'Truck not found'}), 404
+            
+        # Get truck's storage location
+        if truck.storage_location:
+            storage_location = f"{truck.storage_location.street_address}, {truck.storage_location.city}, {truck.storage_location.state}"
+        else:
+            # Fallback to default location
+            storage_location = '100 Industrial Dr, Pewee Valley, KY 40056'
+        
+        # Get truck tickets for the date
+        tickets = Ticket.query.filter(
+            Ticket.truck_id == truck_id,
+            db.func.date(Ticket.scheduled_date) == target_date
+        ).order_by(Ticket.route_position).all()
+        
+        if not tickets:
+            return jsonify({'error': 'No tickets found for this truck and date'}), 404
+        
+        # Build route stops - start and end at storage location
+        route_stops = []
+        
+        # Start: Storage location (where truck is parked)
+        route_stops.append({
+            'type': 'start',
+            'address': storage_location,
+            'description': 'Equipment Storage',
+            'icon': '🏭'
+        })
+        
+        # Customer stops
+        for i, ticket in enumerate(tickets):
+            if ticket.customer:
+                customer_address = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}"
+                route_stops.append({
+                    'type': 'customer',
+                    'address': customer_address,
+                    'description': f"{ticket.customer.first_name} {ticket.customer.last_name}",
+                    'job_id': ticket.job_id,
+                    'service_type': ticket.service_type,
+                    'estimated_duration': ticket.estimated_duration or 60,
+                    'ticket_id': ticket.id,
+                    'icon': '🏠'
+                })
+        
+        # End: Storage location
+        route_stops.append({
+            'type': 'storage',
+            'address': storage_location,
+            'description': 'Equipment Storage',
+            'icon': '🏭'
+        })
+        
+        # Calculate drive times between consecutive stops
+        route_with_drive_times = []
+        total_drive_time = 0
+        total_distance = 0
+        
+        for i, stop in enumerate(route_stops):
+            stop_data = stop.copy()
+            
+            # Calculate drive time to next stop
+            if i < len(route_stops) - 1:
+                next_stop = route_stops[i + 1]
+                drive_result = calculate_drive_time(stop['address'], next_stop['address'])
+                
+                if drive_result:
+                    stop_data['drive_time_to_next'] = drive_result['duration_minutes']
+                    stop_data['distance_to_next'] = drive_result['distance_km']
+                    stop_data['route_geometry_to_next'] = drive_result['geometry']
+                    total_drive_time += drive_result['duration_minutes']
+                    total_distance += drive_result['distance_km']
+                else:
+                    stop_data['drive_time_to_next'] = None
+                    stop_data['distance_to_next'] = None
+                    stop_data['route_geometry_to_next'] = None
+            else:
+                stop_data['drive_time_to_next'] = 0
+                stop_data['distance_to_next'] = 0
+                stop_data['route_geometry_to_next'] = None
+            
+            route_with_drive_times.append(stop_data)
+        
+        # Calculate total work time
+        total_work_time = sum(ticket.estimated_duration or 60 for ticket in tickets)
+        
+        # Build route segments for frontend (drive segments between stops)
+        route_segments = []
+        for i in range(len(route_with_drive_times) - 1):
+            current_stop = route_with_drive_times[i]
+            next_stop = route_with_drive_times[i + 1]
+            
+            if current_stop.get('drive_time_to_next') is not None:
+                route_segments.append({
+                    'from_description': current_stop.get('description', 'Unknown'),
+                    'to_description': next_stop.get('description', 'Unknown'),
+                    'drive_time_minutes': current_stop.get('drive_time_to_next', 0),
+                    'distance_km': current_stop.get('distance_to_next', 0),
+                    'route_geometry': current_stop.get('route_geometry_to_next')
+                })
+        
+        return jsonify({
+            'success': True,
+            'truck_id': truck_id,
+            'date': date,
+            'route_stops': route_with_drive_times,
+            'route_segments': route_segments,
+            'total_drive_time': round(total_drive_time, 1),
+            'total_distance': round(total_distance, 2),
+            'summary': {
+                'total_drive_time': round(total_drive_time, 1),
+                'total_work_time': total_work_time,
+                'total_distance': round(total_distance, 2),
+                'total_stops': len([s for s in route_stops if s['type'] == 'customer']),
+                'estimated_total_time': round(total_drive_time + total_work_time, 1)
+            }
+        })
+        
+    except Exception as e:
+        print(f"Multi-stop route error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/update-all-dates', methods=['POST'])

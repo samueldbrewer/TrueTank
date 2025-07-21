@@ -136,6 +136,7 @@
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeTruckMapModal()">Close</button>
+                <button class="btn btn-primary" onclick="calculateOptimalRoute()" id="routeBtn">🗺️ Calculate Optimal Route</button>
                 <button class="btn btn-success" onclick="exportRoute()">📤 Export Directions</button>
             </div>
         </div>
@@ -1060,6 +1061,84 @@
         height: 300px !important;
     }
 }
+
+/* Drive time boxes for routing */
+.drive-time-box {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.drive-time-box:hover {
+    border-color: #2c5aa0;
+    box-shadow: 0 2px 8px rgba(44, 90, 160, 0.15);
+}
+
+.drive-time-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.drive-time-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.drive-time-details {
+    flex: 1;
+}
+
+.drive-time-duration {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #2c5aa0;
+    margin-bottom: 0.25rem;
+}
+
+.drive-time-distance {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.drive-time-route {
+    font-size: 0.8rem;
+    color: #888;
+    font-style: italic;
+}
+
+/* Special styling for start/end drive time boxes */
+.drive-time-box.drive-time-start {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    border-color: #2196f3;
+}
+
+.drive-time-box.drive-time-start:hover {
+    border-color: #1976d2;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.drive-time-box.drive-time-end {
+    background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+    border-color: #9c27b0;
+}
+
+.drive-time-box.drive-time-end:hover {
+    border-color: #7b1fa2;
+    box-shadow: 0 2px 8px rgba(156, 39, 176, 0.2);
+}
+
+.drive-time-start .drive-time-duration {
+    color: #1976d2;
+}
+
+.drive-time-end .drive-time-duration {
+    color: #7b1fa2;
+}
 </style>
 
 <!-- Leaflet JavaScript -->
@@ -1180,7 +1259,9 @@ function loadJobBoard() {
                     const assignment = data.team_assignments[truckId];
                     teamAssignments[truckId] = {
                         id: assignment.team_member_id,
-                        name: assignment.team_member_name
+                        name: assignment.team_member_name,
+                        position: assignment.position,
+                        home_address: assignment.home_address
                     };
                 });
             }
@@ -2544,6 +2625,262 @@ function refreshMapData() {
             console.error('Error refreshing map data:', error);
             // Don't show alert, just log the error
         });
+}
+
+// Multi-stop route calculation
+async function calculateOptimalRoute() {
+    if (!currentMapTruckId) {
+        alert('No truck selected for routing');
+        return;
+    }
+    
+    const routeBtn = document.getElementById('routeBtn');
+    const originalText = routeBtn.innerHTML;
+    
+    try {
+        // Show loading state
+        routeBtn.disabled = true;
+        routeBtn.innerHTML = '⏳ Calculating Route...';
+        
+        // Call the multi-stop route API - truck's storage location will be used automatically
+        // Route will be: Storage → Customer Jobs → Storage
+        const response = await fetch(`/api/multi-stop-route/${currentMapTruckId}/${currentDate}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Clear existing route lines
+            clearRouteLines();
+            
+            // Add route lines to map
+            addRouteLinesToMap(data.route_segments);
+            
+            // Update sidebar with drive time information
+            updateSidebarWithRoutingInfo(data);
+            
+            alert(`Route calculated successfully!\nTotal drive time: ${data.total_drive_time} minutes\nTotal distance: ${data.total_distance} km`);
+        } else {
+            alert('Failed to calculate route: ' + (data.error || 'Unknown error'));
+        }
+        
+    } catch (error) {
+        console.error('Route calculation error:', error);
+        alert('Error calculating route: ' + error.message);
+    } finally {
+        // Restore button state
+        routeBtn.disabled = false;
+        routeBtn.innerHTML = originalText;
+    }
+}
+
+// Clear existing route lines from map
+function clearRouteLines() {
+    if (truckMap) {
+        truckMap.eachLayer(function(layer) {
+            if (layer.options && layer.options.routeLine) {
+                truckMap.removeLayer(layer);
+            }
+        });
+    }
+}
+
+// Add route lines to the map
+function addRouteLinesToMap(routeSegments) {
+    if (!truckMap) {
+        console.error('No truck map available for route lines');
+        return;
+    }
+    if (!routeSegments) {
+        console.error('No route segments provided');
+        return;
+    }
+    
+    console.log(`Adding ${routeSegments.length} route segments to map`);
+    
+    routeSegments.forEach((segment, index) => {
+        console.log(`Processing segment ${index}:`, segment.from_description, '→', segment.to_description);
+        
+        if (segment.route_geometry) {
+            try {
+                // Decode the polyline geometry
+                const coordinates = decodePolyline(segment.route_geometry);
+                console.log(`Decoded ${coordinates.length} coordinates for segment ${index}`);
+                
+                if (coordinates.length === 0) {
+                    console.warn(`No coordinates decoded for segment ${index}`);
+                    return;
+                }
+                
+                // Create polyline with different colors for different segments
+                const colors = ['#e74c3c', '#2ecc71', '#3498db', '#f39c12', '#9b59b6', '#1abc9c'];
+                const color = colors[index % colors.length];
+                
+                const routeLine = L.polyline(coordinates, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8,
+                    routeLine: true // Mark this as a route line for clearing
+                }).addTo(truckMap);
+                
+                console.log(`Added route line ${index} with color ${color} and ${coordinates.length} points`);
+                
+                // Add popup with segment info
+                routeLine.bindPopup(`
+                    <strong>${segment.from_description} → ${segment.to_description}</strong><br>
+                    Drive time: ${Math.round(segment.drive_time_minutes)} minutes<br>
+                    Distance: ${segment.distance_km.toFixed(1)} km
+                `);
+                
+            } catch (error) {
+                console.error(`Error adding route line for segment ${index}:`, error);
+            }
+        } else {
+            console.warn(`No route geometry for segment ${index}:`, segment.from_description, '→', segment.to_description);
+        }
+    });
+}
+
+// Update sidebar with routing information
+function updateSidebarWithRoutingInfo(routeData) {
+    const sidebar = document.querySelector('.route-summary-sidebar');
+    if (!sidebar) {
+        console.error('Sidebar not found - looking for .route-summary-sidebar');
+        return;
+    }
+    
+    // Find the route jobs list container
+    let routeList = sidebar.querySelector('.route-jobs-list');
+    if (!routeList) {
+        console.error('Route jobs list not found - looking for .route-jobs-list');
+        return;
+    }
+    
+    // Clear existing drive time boxes
+    sidebar.querySelectorAll('.drive-time-box').forEach(box => box.remove());
+    
+    // Add drive time boxes between route items and for start/end
+    const routeItems = routeList.querySelectorAll('.route-job-item');
+    console.log(`Found ${routeItems.length} route items, ${routeData.route_segments.length} segments`);
+    
+    // Debug: Log all route items
+    console.log('=== ROUTE ITEMS ===');
+    routeItems.forEach((item, index) => {
+        console.log(`Route Item ${index}:`, item.textContent.trim());
+    });
+    
+    // Debug: Log all route segments  
+    console.log('=== ROUTE SEGMENTS ===');
+    routeData.route_segments.forEach((segment, index) => {
+        console.log(`Segment ${index}: ${segment.from_description} → ${segment.to_description} (${segment.drive_time_minutes} min)`);
+    });
+    console.log('======================');
+    
+    // Process segments in the correct order to place drive time boxes
+    // Expected structure: Storage → Job1 → Job2 → ... → JobN → Storage
+    routeData.route_segments.forEach((segment, segmentIndex) => {
+        const isStartSegment = segment.from_description.includes('Storage') || segment.from_description.includes('Equipment');
+        const isEndSegment = segment.to_description.includes('Storage') || segment.to_description.includes('Equipment');
+        
+        console.log(`Processing segment ${segmentIndex}: ${segment.from_description} → ${segment.to_description}`);
+        console.log(`  isStartSegment: ${isStartSegment}, isEndSegment: ${isEndSegment}`);
+        
+        let insertLocation = null;
+        let insertPosition = 'afterend';
+        
+        if (segmentIndex === 0) {
+            // First segment (Storage → First Job) - insert before first job
+            insertLocation = routeItems[0];
+            insertPosition = 'beforebegin';
+            console.log(`  Inserting BEFORE first job`);
+        } else if (segmentIndex === routeData.route_segments.length - 1) {
+            // Last segment (Last Job → Storage) - insert after last job
+            insertLocation = routeItems[routeItems.length - 1];
+            insertPosition = 'afterend';
+            console.log(`  Inserting AFTER last job`);
+        } else {
+            // Between jobs - insert after the job that corresponds to this segment
+            // Segment 1 is Job1→Job2, so insert after Job1 (routeItems[0])
+            // Segment 2 is Job2→Job3, so insert after Job2 (routeItems[1])
+            const jobIndex = segmentIndex - 1;
+            if (jobIndex >= 0 && jobIndex < routeItems.length) {
+                insertLocation = routeItems[jobIndex];
+                insertPosition = 'afterend';
+                console.log(`  Inserting after job ${jobIndex + 1}`);
+            }
+        }
+        
+        if (insertLocation) {
+            const driveTimeBox = document.createElement('div');
+            driveTimeBox.className = 'drive-time-box';
+            
+            if (isStartSegment) {
+                driveTimeBox.classList.add('drive-time-start');
+            } else if (isEndSegment) {
+                driveTimeBox.classList.add('drive-time-end');
+            }
+            
+            driveTimeBox.innerHTML = `
+                <div class="drive-time-content">
+                    <div class="drive-time-icon">${isStartSegment ? '🏭' : isEndSegment ? '🏭' : '🚗'}</div>
+                    <div class="drive-time-details">
+                        <div class="drive-time-duration">${Math.round(segment.drive_time_minutes)} min</div>
+                        <div class="drive-time-distance">${segment.distance_km.toFixed(1)} km</div>
+                        <div class="drive-time-route">${segment.from_description} → ${segment.to_description}</div>
+                    </div>
+                </div>
+            `;
+            
+            console.log(`  🎯 Inserting drive time box ${insertPosition} element:`, insertLocation.textContent.trim());
+            console.log(`  📦 Drive time box content: ${Math.round(segment.drive_time_minutes)} min - ${segment.from_description} → ${segment.to_description}`);
+            
+            // Insert the drive time box
+            insertLocation.insertAdjacentElement(insertPosition, driveTimeBox);
+            console.log(`  ✅ Successfully inserted drive time box`);
+            
+            // Debug: Show current sidebar structure after insertion
+            console.log(`  📋 Sidebar structure after insertion:`, routeList.children.length, 'total children');
+        } else {
+            console.log(`  ❌ No insert location found for segment ${segmentIndex}`);
+        }
+    });
+}
+
+// Simple polyline decoder (basic implementation)
+function decodePolyline(encoded) {
+    const coordinates = [];
+    let index = 0, len = encoded.length;
+    let lat = 0, lng = 0;
+    
+    while (index < len) {
+        let b, shift = 0, result = 0;
+        do {
+            b = encoded.charCodeAt(index++) - 63;
+            result |= (b & 0x1f) << shift;
+            shift += 5;
+        } while (b >= 0x20);
+        const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lat += dlat;
+        
+        shift = 0;
+        result = 0;
+        do {
+            b = encoded.charCodeAt(index++) - 63;
+            result |= (b & 0x1f) << shift;
+            shift += 5;
+        } while (b >= 0x20);
+        const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lng += dlng;
+        
+        coordinates.push([lat / 1e5, lng / 1e5]);
+    }
+    
+    return coordinates;
 }
 
 // Close modal when clicking outside
