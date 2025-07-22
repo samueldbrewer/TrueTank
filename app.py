@@ -3419,8 +3419,16 @@ def debug_job_board():
 def init_database():
     """Initialize database tables - use carefully"""
     try:
-        # Create all tables
-        db.create_all()
+        data = request.get_json() or {}
+        force_recreate = data.get('force_recreate', False)
+        
+        if force_recreate:
+            # Drop and recreate all tables
+            db.drop_all()
+            db.create_all()
+        else:
+            # Create all tables (won't affect existing ones)
+            db.create_all()
         
         # Add essential dump sites if none exist
         if DumpSite.query.count() == 0:
