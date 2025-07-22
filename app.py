@@ -3367,6 +3367,54 @@ def health_check():
             'error': str(e)
         }), 500
 
+@app.route('/api/debug-job-board', methods=['GET'])
+def debug_job_board():
+    """Debug the job board API to find the issue"""
+    try:
+        # Test basic queries step by step
+        debug_info = {}
+        
+        # Test trucks query
+        try:
+            trucks = Truck.query.all()
+            debug_info['trucks_query'] = f'Success - found {len(trucks)} trucks'
+        except Exception as e:
+            debug_info['trucks_query'] = f'Failed: {str(e)}'
+        
+        # Test tickets query
+        try:
+            tickets = Ticket.query.all()
+            debug_info['tickets_query'] = f'Success - found {len(tickets)} tickets'
+        except Exception as e:
+            debug_info['tickets_query'] = f'Failed: {str(e)}'
+        
+        # Test team assignments query
+        try:
+            assignments = TruckTeamAssignment.query.all()
+            debug_info['assignments_query'] = f'Success - found {len(assignments)} assignments'
+        except Exception as e:
+            debug_info['assignments_query'] = f'Failed: {str(e)}'
+        
+        # Test specific date query
+        try:
+            from datetime import date
+            today = date.today()
+            today_tickets = Ticket.query.filter(db.func.date(Ticket.scheduled_date) == today).all()
+            debug_info['date_filter_query'] = f'Success - found {len(today_tickets)} tickets for today'
+        except Exception as e:
+            debug_info['date_filter_query'] = f'Failed: {str(e)}'
+        
+        return jsonify({
+            'status': 'debug_complete',
+            'debug_info': debug_info
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'debug_failed',
+            'error': str(e)
+        }), 500
+
 @app.route('/api/init-db', methods=['POST'])
 def init_database():
     """Initialize database tables - use carefully"""
