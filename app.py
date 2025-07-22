@@ -3,7 +3,7 @@ import requests
 from flask import Flask, render_template, request, jsonify
 from models import db, Ticket, Customer, SepticSystem, ServiceHistory, Location, Truck, TeamMember, TruckTeamAssignment, DumpSite
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 import tank_tracking
 
 # Import OpenAI at the top level
@@ -492,8 +492,13 @@ def get_job_board_data():
                 ticket_dict['customer_name'] = f"{ticket.customer.first_name} {ticket.customer.last_name}"
                 ticket_dict['customer_address'] = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}"
             else:
-                ticket_dict['customer_name'] = 'No customer'
-                ticket_dict['customer_address'] = 'No address'
+                # Check if this is a dump stop
+                if ticket.service_type == 'Waste Disposal' or (ticket.job_id and ticket.job_id.startswith('DUMP-')):
+                    ticket_dict['customer_name'] = f"🗑️ {ticket.disposal_location or 'Dump Site'}"
+                    ticket_dict['customer_address'] = ticket.service_description or 'Tank dump location'
+                else:
+                    ticket_dict['customer_name'] = 'No customer'
+                    ticket_dict['customer_address'] = 'No address'
             truck_tickets_with_customer.append(ticket_dict)
         
         truck_schedules[str(truck.id)] = truck_tickets_with_customer
@@ -1570,6 +1575,15 @@ def update_truck_api(truck_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/trucks/<int:truck_id>', methods=['GET'])
+def get_truck(truck_id):
+    """Get a specific truck's information"""
+    try:
+        truck = Truck.query.get_or_404(truck_id)
+        return jsonify(truck.to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/trucks/<int:truck_id>', methods=['DELETE'])
 def delete_truck_api(truck_id):
     try:
@@ -1656,6 +1670,199 @@ def mark_truck_tank_dumped(truck_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/add-dump-stops', methods=['POST'])
+def add_dump_stops():
+    """Add dump stops to a truck's route based on tank capacity and job sequence"""
+    try:
+        data = request.get_json()
+        truck_id = data.get('truck_id')
+        date_str = data.get('date')
+        jobs_with_dumps = data.get('jobs_with_dumps', [])
+        
+        if not truck_id or not date_str:
+            return jsonify({'error': 'truck_id and date are required'}), 400
+        
+        # Parse the date
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Get the truck
+        truck = Truck.query.get_or_404(truck_id)
+        
+        # First, get all existing tickets for this truck on this date to preserve their IDs
+        existing_tickets = Ticket.query.filter(
+            Ticket.truck_id == truck_id,
+            db.func.date(Ticket.scheduled_date) == target_date
+        ).order_by(Ticket.route_position).all()
+        
+        # Remove any existing dump stops to avoid duplicates
+        existing_dump_stops = [t for t in existing_tickets if t.service_type == 'Waste Disposal' or (t.job_id and t.job_id.startswith('DUMP-'))]
+        for dump_stop in existing_dump_stops:
+            existing_tickets.remove(dump_stop)
+            db.session.delete(dump_stop)
+        
+        print(f"Removed {len(existing_dump_stops)} existing dump stops for truck {truck.truck_number} on {target_date}")
+        
+        # Create a map of existing job IDs to tickets
+        existing_job_map = {ticket.id: ticket for ticket in existing_tickets}
+        
+        # Process the jobs_with_dumps array and create new dump tickets where needed
+        dump_tickets_created = 0
+        route_position = 1
+        
+        for item in jobs_with_dumps:
+            if item.get('type') == 'dump':
+                # This is a new dump stop - create a ticket for it
+                dump_site = item.get('dump_site')
+                if dump_site:
+                    # Create a new dump ticket with timestamp to ensure uniqueness
+                    import time
+                    timestamp = int(time.time())
+                    dump_ticket = Ticket(
+                        job_id=f"DUMP-{truck.truck_number}-{target_date.strftime('%Y%m%d')}-{timestamp}-{dump_tickets_created + 1}",
+                        service_type='Waste Disposal',
+                        service_description=f"Dump at {dump_site['name']} - {dump_site['full_address']}",
+                        priority='medium',
+                        status='scheduled',
+                        scheduled_date=datetime.combine(target_date, datetime.min.time().replace(hour=8)) + timedelta(hours=route_position),
+                        estimated_duration=item.get('estimated_duration', 15),
+                        truck_id=truck_id,
+                        route_position=route_position,
+                        estimated_gallons=-item.get('gallons_to_dump', 0),  # Negative for dump
+                        disposal_location=dump_site['name'],
+                        office_notes=f"Auto-generated dump stop at {dump_site['name']}. Cost: ${dump_site.get('cost_per_gallon', 0):.2f}/gallon"
+                    )
+                    
+                    db.session.add(dump_ticket)
+                    dump_tickets_created += 1
+                    
+            else:
+                # This is a regular job - update its route position
+                job_id = item.get('id')
+                if job_id and job_id in existing_job_map:
+                    existing_ticket = existing_job_map[job_id]
+                    existing_ticket.route_position = route_position
+                    existing_ticket.updated_at = datetime.utcnow()
+            
+            route_position += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully added {dump_tickets_created} dump stops to truck {truck.truck_number}',
+            'dump_stops_added': dump_tickets_created
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trucks/<int:truck_id>/jobs', methods=['GET'])
+def get_truck_jobs(truck_id):
+    """Get jobs/tickets for a specific truck on a specific date"""
+    try:
+        date_str = request.args.get('date')
+        if not date_str:
+            return jsonify({'error': 'date parameter is required'}), 400
+            
+        # Parse the date
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
+        # Get the truck
+        truck = Truck.query.get_or_404(truck_id)
+        
+        # Get scheduled tickets for this truck on the target date
+        tickets = Ticket.query.filter(
+            Ticket.truck_id == truck_id,
+            db.func.date(Ticket.scheduled_date) == target_date
+        ).order_by(Ticket.route_position).all()
+        
+        # Convert to dict with customer information
+        truck_jobs = []
+        for ticket in tickets:
+            ticket_dict = ticket.to_dict()
+            if ticket.customer:
+                ticket_dict['customer_name'] = f"{ticket.customer.first_name} {ticket.customer.last_name}"
+                ticket_dict['customer_address'] = f"{ticket.customer.street_address}, {ticket.customer.city}, {ticket.customer.state}" if ticket.customer.street_address else None
+                ticket_dict['customer_gps_coordinates'] = ticket.customer.gps_coordinates
+            else:
+                # Check if this is a dump stop
+                if ticket.service_type == 'Waste Disposal' or (ticket.job_id and ticket.job_id.startswith('DUMP-')):
+                    ticket_dict['customer_name'] = f"🗑️ {ticket.disposal_location or 'Dump Site'}"
+                    ticket_dict['customer_address'] = ticket.service_description or 'Tank dump location'
+                    ticket_dict['customer_gps_coordinates'] = None  # Dump sites don't have customer GPS
+                else:
+                    ticket_dict['customer_name'] = ticket.job_id  # Fallback to job ID for other tickets
+                    ticket_dict['customer_address'] = None
+                    ticket_dict['customer_gps_coordinates'] = None
+            truck_jobs.append(ticket_dict)
+        
+        return jsonify(truck_jobs)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update-estimated-gallons', methods=['POST'])
+def update_estimated_gallons():
+    """Update estimated gallons for all existing tickets based on service type and tank size"""
+    try:
+        updated_count = 0
+        tickets = Ticket.query.filter(Ticket.estimated_gallons.is_(None)).all()
+        
+        print(f"Found {len(tickets)} tickets without estimated gallons")
+        
+        for ticket in tickets:
+            estimated_gallons = calculate_estimated_gallons_for_ticket(ticket)
+            if estimated_gallons:
+                ticket.estimated_gallons = estimated_gallons
+                updated_count += 1
+                print(f"Updated ticket {ticket.job_id}: {estimated_gallons} gallons")
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Updated estimated gallons for {updated_count} tickets',
+            'updated_count': updated_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+def calculate_estimated_gallons_for_ticket(ticket):
+    """Calculate estimated gallons for a ticket based on service type and septic system"""
+    if not ticket.septic_system:
+        return None
+    
+    tank_size = ticket.septic_system.tank_size
+    if not tank_size:
+        return None
+    
+    service_type = ticket.service_type
+    if not service_type:
+        return None
+    
+    # Calculate based on service type (same logic as frontend)
+    service_multipliers = {
+        'Septic Pumping': 0.8,          # 80% of tank
+        'Septic Cleaning': 0.85,        # 85% of tank  
+        'Septic Inspection': 0.15,      # 15% of tank
+        'Emergency Service': 0.7,       # 70% of tank
+        'Preventive Maintenance': 0.5,  # 50% of tank
+        'Grease Trap Service': 0.4,     # 40% of tank
+        'Lift Station Service': 0.3,    # 30% of tank
+        'Septic Repair': 0.2,          # 20% of tank
+        'Septic Installation': 0.2,     # 20% of tank
+        'Line Cleaning/Rooter': 0.2,    # 20% of tank
+    }
+    
+    multiplier = service_multipliers.get(service_type, 0.5)  # Default 50%
+    return round(tank_size * multiplier)
 
 # Location Management APIs
 @app.route('/api/locations', methods=['GET'])

@@ -189,6 +189,18 @@
                                value="{{ ticket.gallons_pumped if ticket else '' }}">
                     </div>
                     <div class="form-group">
+                        <label for="estimated_gallons">Estimated Gallons (Route Planning)</label>
+                        <div class="input-with-button">
+                            <input type="number" id="estimated_gallons" name="estimated_gallons" min="0" 
+                                   value="{{ ticket.estimated_gallons if ticket else '' }}" 
+                                   placeholder="Auto-calculated">
+                            <button type="button" id="auto-estimate-btn" class="btn-auto-estimate" title="Auto-calculate based on customer tank size and service type">🔄 Auto</button>
+                        </div>
+                        <small class="field-help">Used for route planning and dump scheduling</small>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="waste_type">Waste Type</label>
                         <select id="waste_type" name="waste_type">
                             <option value="">Select Type</option>
@@ -438,7 +450,8 @@
     align-items: center;
 }
 
-.input-with-button select {
+.input-with-button select,
+.input-with-button input {
     flex: 1;
 }
 
@@ -446,6 +459,30 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.875rem;
     white-space: nowrap;
+}
+
+.btn-auto-estimate {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.btn-auto-estimate:hover {
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    transform: translateY(-1px);
+}
+
+.field-help {
+    font-size: 0.7rem;
+    color: #7f8c8d;
+    margin-top: 0.25rem;
+    font-style: italic;
 }
 
 /* Modal Styles */
@@ -906,6 +943,28 @@ document.addEventListener('DOMContentLoaded', function() {
         filterSepticSystems(customerSelect.value);
     }
     
+    // Auto-estimate gallons functionality
+    const autoEstimateBtn = document.getElementById('auto-estimate-btn');
+    const serviceTypeSelect = document.getElementById('service_type');
+    const estimatedGallonsInput = document.getElementById('estimated_gallons');
+    
+    if (autoEstimateBtn) {
+        autoEstimateBtn.addEventListener('click', calculateEstimatedGallons);
+    }
+    
+    // Auto-calculate when service type or system changes (only if both are selected)
+    serviceTypeSelect.addEventListener('change', function() {
+        if (systemSelect.value && serviceTypeSelect.value) {
+            autoCalculateIfEmpty();
+        }
+    });
+    
+    systemSelect.addEventListener('change', function() {
+        if (systemSelect.value && serviceTypeSelect.value) {
+            autoCalculateIfEmpty();
+        }
+    });
+    
     // Form submission
     document.getElementById('ticket-form').addEventListener('submit', handleFormSubmit);
 });
@@ -1324,5 +1383,129 @@ document.addEventListener('click', function(event) {
         closeTicketAIEstimateModal();
     }
 });
+
+// Estimated gallons calculation functions
+function calculateEstimatedGallons() {
+    const systemSelect = document.getElementById('septic_system_id');
+    const serviceTypeSelect = document.getElementById('service_type');
+    const estimatedGallonsInput = document.getElementById('estimated_gallons');
+    
+    if (!systemSelect.value || !serviceTypeSelect.value) {
+        alert('Please select both a customer system and service type first.');
+        return;
+    }
+    
+    // Get selected system option to extract tank size
+    const selectedOption = systemSelect.options[systemSelect.selectedIndex];
+    const optionText = selectedOption.textContent;
+    
+    // Extract tank size from option text (format: "Type - 1000 gal (Material)")
+    const tankSizeMatch = optionText.match(/(\d+)\s*gal/);
+    const tankSize = tankSizeMatch ? parseInt(tankSizeMatch[1]) : null;
+    
+    if (!tankSize) {
+        alert('Could not determine tank size from selected system.');
+        return;
+    }
+    
+    // Calculate estimated gallons based on service type and tank size
+    let estimatedGallons = calculateGallonsByService(serviceTypeSelect.value, tankSize);
+    
+    // Update the input field
+    estimatedGallonsInput.value = estimatedGallons;
+    
+    // Visual feedback
+    estimatedGallonsInput.style.background = '#e8f5e8';
+    setTimeout(() => {
+        estimatedGallonsInput.style.background = '';
+    }, 1000);
+}
+
+function calculateGallonsByService(serviceType, tankSize) {
+    switch (serviceType) {
+        case 'Septic Pumping':
+            // Full pumping: 70-90% of tank capacity
+            return Math.round(tankSize * 0.8);
+            
+        case 'Septic Cleaning':
+            // Deep cleaning: 80-95% of tank capacity  
+            return Math.round(tankSize * 0.85);
+            
+        case 'Septic Inspection':
+            // Inspection with minimal pumping: 10-20%
+            return Math.round(tankSize * 0.15);
+            
+        case 'Emergency Service':
+            // Emergency pumping: 60-80%
+            return Math.round(tankSize * 0.7);
+            
+        case 'Preventive Maintenance':
+            // Maintenance pumping: 40-60%
+            return Math.round(tankSize * 0.5);
+            
+        case 'Grease Trap Service':
+            // Grease removal: 30-50% of tank
+            return Math.round(tankSize * 0.4);
+            
+        case 'Lift Station Service':
+            // Lift station: 20-40%
+            return Math.round(tankSize * 0.3);
+            
+        case 'Septic Repair':
+        case 'Septic Installation':
+        case 'Line Cleaning/Rooter':
+            // Minimal waste removal: 10-25%
+            return Math.round(tankSize * 0.2);
+            
+        default:
+            // Default estimate: 50% of tank size
+            return Math.round(tankSize * 0.5);
+    }
+}
+
+function autoCalculateIfEmpty() {
+    const estimatedGallonsInput = document.getElementById('estimated_gallons');
+    const systemSelect = document.getElementById('septic_system_id');
+    const serviceTypeSelect = document.getElementById('service_type');
+    
+    // Only auto-calculate if field is empty and both selections are made
+    if (!estimatedGallonsInput.value && systemSelect.value && serviceTypeSelect.value) {
+        calculateEstimatedGallonsSilently();
+    }
+}
+
+function calculateEstimatedGallonsSilently() {
+    const systemSelect = document.getElementById('septic_system_id');
+    const serviceTypeSelect = document.getElementById('service_type');
+    const estimatedGallonsInput = document.getElementById('estimated_gallons');
+    
+    if (!systemSelect.value || !serviceTypeSelect.value) {
+        return; // Silent return, no alert
+    }
+    
+    // Get selected system option to extract tank size
+    const selectedOption = systemSelect.options[systemSelect.selectedIndex];
+    const optionText = selectedOption.textContent;
+    
+    // Extract tank size from option text (format: "Type - 1000 gal (Material)")
+    const tankSizeMatch = optionText.match(/(\d+)\s*gal/);
+    const tankSize = tankSizeMatch ? parseInt(tankSizeMatch[1]) : null;
+    
+    if (!tankSize) {
+        return; // Silent return, no alert
+    }
+    
+    // Calculate estimated gallons based on service type and tank size
+    let estimatedGallons = calculateGallonsByService(serviceTypeSelect.value, tankSize);
+    
+    // Update the input field
+    estimatedGallonsInput.value = estimatedGallons;
+    
+    // Visual feedback
+    estimatedGallonsInput.style.background = '#e8f5e8';
+    setTimeout(() => {
+        estimatedGallonsInput.style.background = '';
+    }, 1000);
+}
 </script>
 {% endblock %}

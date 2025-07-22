@@ -46,7 +46,7 @@
             </thead>
             <tbody>
                 {% for ticket in tickets %}
-                <tr>
+                <tr class="job-row" data-ticket-id="{{ ticket.id }}" onclick="window.location.href='/ticket/{{ ticket.id }}'">
                     <td class="job-id">{{ ticket.job_id }}</td>
                     <td>
                         <div class="customer-info">
@@ -85,6 +85,7 @@
         {% endif %}
     </div>
 </div>
+
 
 <style>
 .database-container {
@@ -234,5 +235,17 @@ th {
         min-width: 800px;
     }
 }
+
+.job-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.job-row:hover {
+    background-color: #f8f9fa;
+}
+
 </style>
+
+
 {% endblock %}
