@@ -3340,6 +3340,33 @@ def update_all_ticket_dates():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Simple health check endpoint"""
+    try:
+        # Try to query database
+        customer_count = db.session.execute(db.text('SELECT COUNT(*) FROM customer')).scalar()
+        ticket_count = db.session.execute(db.text('SELECT COUNT(*) FROM ticket')).scalar()
+        truck_count = db.session.execute(db.text('SELECT COUNT(*) FROM truck')).scalar()
+        dump_site_count = db.session.execute(db.text('SELECT COUNT(*) FROM dump_site')).scalar()
+        
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected',
+            'counts': {
+                'customers': customer_count,
+                'tickets': ticket_count,
+                'trucks': truck_count,
+                'dump_sites': dump_site_count
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'database': 'error',
+            'error': str(e)
+        }), 500
+
 @app.route('/api/init-db', methods=['POST'])
 def init_database():
     """Initialize database tables - use carefully"""
@@ -3406,6 +3433,118 @@ def init_database():
             'success': True,
             'message': 'Database initialized successfully',
             'tables_created': True
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/create-sample-data', methods=['POST'])
+def create_sample_data():
+    """Create basic sample data for testing"""
+    try:
+        from datetime import datetime, timedelta
+        
+        # Create a few customers if none exist
+        if Customer.query.count() == 0:
+            customers = [
+                Customer(
+                    first_name='John',
+                    last_name='Smith',
+                    street_address='123 Main St',
+                    city='Louisville',
+                    state='KY',
+                    zip_code='40214',
+                    phone_number='(502) 555-0123',
+                    email='john.smith@example.com'
+                ),
+                Customer(
+                    first_name='Sarah',
+                    last_name='Johnson',
+                    street_address='456 Oak Ave',
+                    city='La Grange',
+                    state='KY',
+                    zip_code='40031',
+                    phone_number='(502) 555-0456',
+                    email='sarah.johnson@example.com'
+                )
+            ]
+            
+            for customer in customers:
+                db.session.add(customer)
+            db.session.commit()
+        
+        # Create trucks if none exist
+        if Truck.query.count() == 0:
+            trucks = [
+                Truck(
+                    truck_number='TT-01',
+                    make='Ford',
+                    model='F-550',
+                    year=2020,
+                    tank_capacity=3000,
+                    current_tank_level=750,
+                    license_plate='KY-TT01'
+                ),
+                Truck(
+                    truck_number='TT-02',
+                    make='Chevrolet',
+                    model='Silverado 3500',
+                    year=2021,
+                    tank_capacity=4000,
+                    current_tank_level=1200,
+                    license_plate='KY-TT02'
+                )
+            ]
+            
+            for truck in trucks:
+                db.session.add(truck)
+            db.session.commit()
+        
+        # Create some tickets if none exist
+        if Ticket.query.count() == 0:
+            customers = Customer.query.all()
+            if customers:
+                today = datetime.now()
+                tickets = [
+                    Ticket(
+                        job_id=f'JOB-{today.strftime("%Y%m%d")}-001',
+                        customer_id=customers[0].id,
+                        service_type='Septic Pumping',
+                        priority='medium',
+                        status='pending',
+                        scheduled_date=today,
+                        estimated_duration=90,
+                        service_description='Regular septic pumping service'
+                    ),
+                    Ticket(
+                        job_id=f'JOB-{today.strftime("%Y%m%d")}-002',
+                        customer_id=customers[1].id if len(customers) > 1 else customers[0].id,
+                        service_type='Septic Inspection',
+                        priority='high',
+                        status='pending',
+                        scheduled_date=today,
+                        estimated_duration=60,
+                        service_description='Annual septic system inspection'
+                    )
+                ]
+                
+                for ticket in tickets:
+                    db.session.add(ticket)
+                db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Sample data created successfully',
+            'counts': {
+                'customers': Customer.query.count(),
+                'trucks': Truck.query.count(),
+                'tickets': Ticket.query.count(),
+                'dump_sites': DumpSite.query.count()
+            }
         })
         
     except Exception as e:
