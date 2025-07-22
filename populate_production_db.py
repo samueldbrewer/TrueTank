@@ -9,7 +9,7 @@ import json
 import requests
 from datetime import datetime, date, timedelta
 from models import db, Customer, Ticket, SepticSystem, ServiceHistory, Location, Truck, TeamMember, TruckTeamAssignment, DumpSite
-from app import create_sample_data
+from populate_sample_data import main as create_sample_data
 
 # Set environment for production database
 os.environ['DATABASE_URL'] = 'postgresql://postgres:mvqnOAuUuTLVLWqePdOKTuoqNckRFnMn@junction.proxy.rlwy.net:27479/railway'
@@ -37,8 +37,9 @@ def populate_production_database():
         print(f"   Trucks: {Truck.query.count()}")
         
         if existing_customers > 0:
-            response = input("🤔 Database already has data. Clear and recreate? (y/N): ").strip().lower()
-            if response == 'y':
+            print("✅ Database has existing data. Adding missing dump sites and tank tracking data...")
+            # Don't clear data, just add missing components
+            if False:  # This condition will never be true, so we skip clearing
                 print("🗑️ Clearing existing data...")
                 # Clear all tables in dependency order
                 TruckTeamAssignment.query.delete()

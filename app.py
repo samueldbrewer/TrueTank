@@ -3340,6 +3340,81 @@ def update_all_ticket_dates():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/init-db', methods=['POST'])
+def init_database():
+    """Initialize database tables - use carefully"""
+    try:
+        # Create all tables
+        db.create_all()
+        
+        # Add essential dump sites if none exist
+        if DumpSite.query.count() == 0:
+            dump_sites = [
+                DumpSite(
+                    name='Jefferson County Waste Management',
+                    facility_type='Municipal',
+                    street_address='8900 National Turnpike',
+                    city='Louisville',
+                    state='KY',
+                    zip_code='40214',
+                    county='Jefferson',
+                    operating_hours='6:00 AM - 6:00 PM, Mon-Fri',
+                    cost_per_gallon=0.08,
+                    estimated_dump_time=20,
+                    is_active=True,
+                    accepts_septic_waste=True,
+                    accepts_grease_waste=True
+                ),
+                DumpSite(
+                    name='Oldham County Wastewater Treatment',
+                    facility_type='County',
+                    street_address='1356 S 4th St',
+                    city='La Grange',
+                    state='KY', 
+                    zip_code='40031',
+                    county='Oldham',
+                    operating_hours='7:00 AM - 4:00 PM, Mon-Fri',
+                    cost_per_gallon=0.10,
+                    estimated_dump_time=25,
+                    is_active=True,
+                    accepts_septic_waste=True,
+                    accepts_grease_waste=False
+                ),
+                DumpSite(
+                    name='Bullitt County Sewage Treatment Plant',
+                    facility_type='County',
+                    street_address='300 Dixie Hwy',
+                    city='Shepherdsville', 
+                    state='KY',
+                    zip_code='40165',
+                    county='Bullitt',
+                    operating_hours='8:00 AM - 5:00 PM, Mon-Fri',
+                    cost_per_gallon=0.12,
+                    estimated_dump_time=30,
+                    is_active=True,
+                    accepts_septic_waste=True,
+                    accepts_grease_waste=True
+                )
+            ]
+            
+            for site in dump_sites:
+                db.session.add(site)
+            
+            db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database initialized successfully',
+            'tables_created': True
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     # Initialize database when app starts (commented out during debugging)
     # init_database()
