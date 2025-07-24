@@ -3514,7 +3514,7 @@ def create_sample_data():
                     city='Louisville',
                     state='KY',
                     zip_code='40214',
-                    phone_number='(502) 555-0123',
+                    phone_primary='(502) 555-0123',
                     email='john.smith@example.com'
                 ),
                 Customer(
@@ -3524,7 +3524,7 @@ def create_sample_data():
                     city='La Grange',
                     state='KY',
                     zip_code='40031',
-                    phone_number='(502) 555-0456',
+                    phone_primary='(502) 555-0456',
                     email='sarah.johnson@example.com'
                 )
             ]
