@@ -3747,9 +3747,19 @@ def create_comprehensive_data():
                 base_time = datetime.combine(current_date, datetime.min.time())
                 scheduled_time = base_time + timedelta(hours=random.randint(8, 16))
                 
+                # Create unique job_id (check for existing ones)
+                job_id_base = f'JOB-{current_date.strftime("%Y%m%d")}'
+                job_counter = 1
+                while True:
+                    job_id = f'{job_id_base}-{job_counter:03d}'
+                    existing = Ticket.query.filter_by(job_id=job_id).first()
+                    if not existing:
+                        break
+                    job_counter += 1
+                
                 # Create ticket
                 ticket = Ticket(
-                    job_id=f'JOB-{current_date.strftime("%Y%m%d")}-{i+1:03d}',
+                    job_id=job_id,
                     customer_id=customer.id,
                     service_type=service_type,
                     service_description=description,
