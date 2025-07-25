@@ -3610,6 +3610,181 @@ def create_sample_data():
             'error': str(e)
         }), 500
 
+@app.route('/api/create-comprehensive-data', methods=['POST'])
+def create_comprehensive_data():
+    """Create comprehensive sample data including many tickets"""
+    try:
+        from datetime import datetime, timedelta, date
+        import random
+        
+        # Service types and characteristics
+        service_types = {
+            'Septic Pumping': {
+                'duration_range': (60, 120),
+                'priority_weights': {'medium': 0.6, 'high': 0.3, 'low': 0.1},
+                'descriptions': [
+                    'Regular septic pumping service',
+                    'Scheduled maintenance pumping', 
+                    'Annual septic tank cleanout',
+                    'Preventive septic pumping'
+                ]
+            },
+            'Septic Inspection': {
+                'duration_range': (45, 90),
+                'priority_weights': {'medium': 0.5, 'high': 0.4, 'urgent': 0.1},
+                'descriptions': [
+                    'Annual septic system inspection',
+                    'Pre-sale septic inspection',
+                    'County-required septic inspection',
+                    'Routine system health check'
+                ]
+            },
+            'Emergency Service': {
+                'duration_range': (90, 180),
+                'priority_weights': {'urgent': 0.7, 'high': 0.3},
+                'descriptions': [
+                    'Emergency septic backup',
+                    'Urgent septic overflow',
+                    'Emergency tank pumping',
+                    'Critical septic system failure'
+                ]
+            },
+            'Septic Repair': {
+                'duration_range': (120, 240),
+                'priority_weights': {'high': 0.6, 'medium': 0.3, 'urgent': 0.1},
+                'descriptions': [
+                    'Septic pump repair',
+                    'Tank baffle replacement',
+                    'Pipe repair and replacement',
+                    'System component repair'
+                ]
+            },
+            'Grease Trap Service': {
+                'duration_range': (30, 60),
+                'priority_weights': {'medium': 0.7, 'high': 0.2, 'low': 0.1},
+                'descriptions': [
+                    'Commercial grease trap cleaning',
+                    'Restaurant grease trap service',
+                    'Monthly grease trap maintenance',
+                    'Grease trap pump-out'
+                ]
+            }
+        }
+        
+        def weighted_choice(choices):
+            items = list(choices.keys())
+            weights = list(choices.values())
+            return random.choices(items, weights=weights)[0]
+        
+        # First ensure we have enough customers
+        customer_count = Customer.query.count()
+        if customer_count < 10:
+            # Create additional customers
+            additional_customers = [
+                Customer(first_name='Mike', last_name='Davis', street_address='789 Pine Rd', city='Shepherdsville', state='KY', zip_code='40165', phone_primary='(502) 555-0789', email='mike.davis@example.com'),
+                Customer(first_name='Lisa', last_name='Wilson', street_address='321 Elm St', city='Louisville', state='KY', zip_code='40202', phone_primary='(502) 555-0321', email='lisa.wilson@example.com'),
+                Customer(first_name='David', last_name='Brown', street_address='654 Maple Ave', city='La Grange', state='KY', zip_code='40031', phone_primary='(502) 555-0654', email='david.brown@example.com'),
+                Customer(first_name='Jennifer', last_name='Taylor', street_address='987 Cedar Ln', city='Shepherdsville', state='KY', zip_code='40165', phone_primary='(502) 555-0987', email='jennifer.taylor@example.com'),
+                Customer(first_name='Robert', last_name='Anderson', street_address='147 Oak Dr', city='Louisville', state='KY', zip_code='40214', phone_primary='(502) 555-0147', email='robert.anderson@example.com'),
+                Customer(first_name='Maria', last_name='Garcia', street_address='258 Pine St', city='La Grange', state='KY', zip_code='40031', phone_primary='(502) 555-0258', email='maria.garcia@example.com'),
+                Customer(first_name='William', last_name='Martinez', street_address='369 Birch Rd', city='Shepherdsville', state='KY', zip_code='40165', phone_primary='(502) 555-0369', email='william.martinez@example.com'),
+                Customer(first_name='Patricia', last_name='Jones', street_address='741 Walnut Ave', city='Louisville', state='KY', zip_code='40202', phone_primary='(502) 555-0741', email='patricia.jones@example.com')
+            ]
+            
+            for customer in additional_customers:
+                db.session.add(customer)
+            db.session.commit()
+        
+        # Get updated customer count
+        customers = Customer.query.all()
+        trucks = Truck.query.all()
+        
+        # Create tickets for multiple days
+        start_date = datetime.now().date()
+        tickets_created = 0
+        
+        # Create tickets for past week, today, and next week (15 days total)
+        for day_offset in range(-7, 8):
+            current_date = start_date + timedelta(days=day_offset)
+            
+            # Vary tickets per day
+            if day_offset == 0:  # Today - more tickets
+                daily_tickets = random.randint(6, 8)
+            elif abs(day_offset) <= 3:  # This week
+                daily_tickets = random.randint(4, 6)
+            else:  # Other days
+                daily_tickets = random.randint(2, 4)
+            
+            for i in range(daily_tickets):
+                # Select service type
+                service_type = random.choice(list(service_types.keys()))
+                service_info = service_types[service_type]
+                
+                # Generate ticket properties
+                duration = random.randint(*service_info['duration_range'])
+                priority = weighted_choice(service_info['priority_weights'])
+                description = random.choice(service_info['descriptions'])
+                
+                # Assign customer
+                customer = random.choice(customers)
+                
+                # Status based on date
+                if day_offset < -1:
+                    status = random.choice(['completed', 'completed', 'completed', 'in_progress'])
+                elif day_offset == -1:
+                    status = random.choice(['completed', 'in_progress', 'assigned'])
+                elif day_offset == 0:
+                    status = random.choice(['pending', 'assigned', 'in_progress'])
+                else:
+                    status = 'pending'
+                
+                # Truck assignment
+                truck_id = None
+                if status in ['assigned', 'in_progress', 'completed'] and trucks:
+                    truck_id = random.choice(trucks).id
+                
+                # Create scheduled datetime
+                base_time = datetime.combine(current_date, datetime.min.time())
+                scheduled_time = base_time + timedelta(hours=random.randint(8, 16))
+                
+                # Create ticket
+                ticket = Ticket(
+                    job_id=f'JOB-{current_date.strftime("%Y%m%d")}-{i+1:03d}',
+                    customer_id=customer.id,
+                    service_type=service_type,
+                    service_description=description,
+                    priority=priority,
+                    status=status,
+                    scheduled_date=scheduled_time,
+                    estimated_duration=duration,
+                    truck_id=truck_id,
+                    route_position=i+1 if truck_id else None
+                )
+                
+                db.session.add(ticket)
+                tickets_created += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Created comprehensive data successfully',
+            'tickets_created': tickets_created,
+            'counts': {
+                'customers': Customer.query.count(),
+                'trucks': Truck.query.count(),
+                'tickets': Ticket.query.count(),
+                'dump_sites': DumpSite.query.count()
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     # Initialize database when app starts (commented out during debugging)
     # init_database()
